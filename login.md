@@ -14,7 +14,7 @@ If no admin accounts exist yet, use the **First-time setup: Create admin** butto
 Before using it, **set a private, strong bootstrap code** (the default is `CHANGE_ME_BEFORE_DEPLOYMENT`)
 and deploy matching Firestore rules. Anyone with access to the HTML source can see the code, so
 rotate it immediately after setup and only use this flow in a trusted environment.
-1. Update `BOOTSTRAP_CODE` in `index.html` to a private code (the default is blank).
+1. Update `BOOTSTRAP_CODE` in `index.html` to a private code (the default is `CHANGE_ME_BEFORE_DEPLOYMENT`).
 2. Update `bootstrapCode()` in `firestore.rules` to the same value.
 3. Deploy the rules (`firebase deploy --only firestore:rules`).
 

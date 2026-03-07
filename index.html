@@ -1103,7 +1103,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Set a strong code and keep it in sync with firestore.rules
+const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Rotate after first use; never deploy with the default value.
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1113,6 +1113,7 @@ let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
 let bootstrapCreatePromise = null;
 let bootstrapUid = null;
+const bootstrapCleanupAttempted = new Set();
 
 const bootstrapBtn = document.getElementById('bootstrap-btn');
 if (bootstrapBtn && (!BOOTSTRAP_CODE || BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT')) {
@@ -1138,16 +1139,20 @@ async function logActivity(msg) {
 }
 
 async function cleanupBootstrapCode(docRef, notify = false) {
-    try {
-        await updateDoc(docRef, { bootstrapCode: deleteField() });
-        return true;
-    } catch (cleanupErr) {
-        console.warn('Bootstrap cleanup failed:', cleanupErr);
-        if (notify) {
-            toast('Admin created, but bootstrap cleanup failed. Remove bootstrapCode manually.', 6000);
+    let lastErr;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            await updateDoc(docRef, { bootstrapCode: deleteField() });
+            return true;
+        } catch (cleanupErr) {
+            lastErr = cleanupErr;
         }
-        return false;
     }
+    console.warn('Bootstrap cleanup failed:', lastErr);
+    if (notify) {
+        toast('Admin created, but bootstrap cleanup failed. Remove bootstrapCode manually.', 6000);
+    }
+    return false;
 }
 
 window.togglePw = function(id, btn) {
@@ -1289,6 +1294,7 @@ window.setupAdmin = async function() {
         if (createdUser) {
             try { await deleteUser(createdUser); } catch (cleanupErr) {
                 console.warn('Bootstrap account cleanup failed:', cleanupErr);
+                toast('Bootstrap account created without profile. Delete it in Firebase Auth.', 7000);
             }
         }
         try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
@@ -1346,7 +1352,8 @@ async function loadProfile(user) {
     }
     const data = snap.data();
     if (!data.active) throw new Error('inactive');
-    if (data.bootstrapCode && data.role === 'admin') {
+    if (data.bootstrapCode && data.role === 'admin' && !bootstrapCleanupAttempted.has(snap.id)) {
+        bootstrapCleanupAttempted.add(snap.id);
         const cleaned = await cleanupBootstrapCode(snap.ref);
         if (cleaned) data.bootstrapCode = undefined;
     }
