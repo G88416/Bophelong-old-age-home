@@ -236,7 +236,7 @@
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.5);
             display: flex; align-items: center; justify-content: center;
-            z-index: 200; padding: 20px;
+            z-index: 1000; padding: 20px;
         }
         .modal-overlay[hidden] { display: none !important; }
         .modal {
@@ -368,6 +368,157 @@
             padding: 0; line-height: 1;
         }
         .pw-toggle:hover { color: var(--purple); }
+
+        /* ── Bottom Navigation ──────────────────────────────────────── */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 72px;
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            z-index: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+        }
+
+        .nav-items {
+            display: flex;
+            gap: 8px;
+            max-width: 420px;
+            width: 100%;
+            justify-content: space-around;
+        }
+
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 11px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            transition: all 0.28s ease;
+        }
+
+        .nav-btn .icon {
+            font-size: 1.5rem;
+        }
+
+        .nav-btn.active,
+        .nav-btn:hover {
+            color: #22d3ee;
+            background: rgba(34, 211, 238, 0.12);
+            transform: translateY(-2px);
+        }
+
+        /* ── Floating Orb & Radial Menu ─────────────────────────────── */
+        .orb-container {
+            position: fixed;
+            bottom: 96px;         /* above bottom bar */
+            right: 24px;
+            z-index: 950;
+        }
+
+        .orb {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #22d3ee, #0891b2);
+            border: none;
+            color: white;
+            font-size: 2rem;
+            font-weight: bold;
+            box-shadow: 0 8px 32px rgba(34, 211, 238, 0.4);
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: breathe 4s infinite ease-in-out;
+        }
+
+        @keyframes breathe {
+            0%,100% { transform: scale(1); }
+            50%     { transform: scale(1.06); }
+        }
+
+        .orb:hover {
+            transform: scale(1.15) rotate(8deg);
+            box-shadow: 0 16px 48px rgba(34, 211, 238, 0.55);
+        }
+
+        .radial-menu {
+            position: absolute;
+            bottom: 50%;
+            right: 50%;
+            width: 280px;
+            height: 280px;
+            transform: translate(50%, 50%) scale(0);
+            transform-origin: bottom right;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+        }
+
+        .radial-menu[hidden] { display: none; }
+
+        .radial-menu:not([hidden]) {
+            transform: translate(50%, 50%) scale(1);
+            pointer-events: auto;
+        }
+
+        .radial-item {
+            position: absolute;
+            width: 110px;
+            height: 44px;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            color: white;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(var(--angle)) translateX(120px) rotate(calc(-1 * var(--angle)));
+            transition: all 0.35s ease;
+            cursor: pointer;
+        }
+
+        .radial-item:hover {
+            background: rgba(34, 211, 238, 0.25);
+            transform: rotate(var(--angle)) translateX(132px) rotate(calc(-1 * var(--angle))) scale(1.1);
+        }
+
+        .menu-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            z-index: 940;
+        }
+
+        .menu-overlay[hidden] { display: none; }
+
+        @media (max-width: 900px) {
+            .content { padding-bottom: 120px; }
+        }
+
+        @media (min-width: 900px) {
+            .bottom-nav,
+            .orb-container,
+            .menu-overlay {
+                display: none;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .orb-container { right: 16px; bottom: 88px; }
+        }
     </style>
 </head>
 <body>
@@ -649,6 +800,19 @@
 
         </div><!-- /content -->
     </main>
+    <div class="bottom-nav" id="bottom-nav" aria-label="Primary">
+        <div class="nav-items" id="bottom-nav-items"></div>
+    </div>
+    <div class="orb-container">
+        <button class="orb" id="orb-toggle" type="button" aria-label="Open quick actions" aria-expanded="false" onclick="toggleOrbMenu()">＋</button>
+        <div class="radial-menu" id="radial-menu" hidden>
+            <button class="radial-item" style="--angle: -15deg" type="button" onclick="openModal('resident'); toggleOrbMenu(false);">+ Resident</button>
+            <button class="radial-item" style="--angle: -55deg" type="button" onclick="openModal('task'); toggleOrbMenu(false);">+ Task</button>
+            <button class="radial-item" style="--angle: -95deg" type="button" onclick="openModal('medication'); toggleOrbMenu(false);">+ Medication</button>
+            <button class="radial-item" style="--angle: -135deg" type="button" onclick="openModal('leave'); toggleOrbMenu(false);">+ Leave</button>
+        </div>
+    </div>
+    <div class="menu-overlay" id="menu-overlay" hidden onclick="toggleOrbMenu(false)"></div>
 </div><!-- /app -->
 
 <!-- ═══════════════ MODALS ═══════════════ -->
@@ -1052,6 +1216,7 @@ function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     buildSidebar();
+    buildBottomNav();
     renderUserInfo();
     updateClock();
     navigateTo('dashboard');
@@ -1087,6 +1252,26 @@ function buildSidebar() {
     });
 }
 
+function buildBottomNav() {
+    const nav = document.getElementById('bottom-nav-items');
+    if (!nav) return;
+    const role = currentProfile.role;
+    nav.innerHTML = '';
+
+    const visible = NAV_ITEMS.filter(n => n.roles.includes(role));
+    visible.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'nav-btn';
+        btn.dataset.section = item.id;
+        btn.innerHTML = `<span class="icon">${item.icon}</span><span>${item.label}</span>`;
+        btn.addEventListener('click', () => navigateTo(item.id));
+        nav.appendChild(btn);
+    });
+
+    updateBottomNavActiveState(activeSectionId);
+}
+
 function renderUserInfo() {
     const p = currentProfile;
     document.getElementById('user-name').textContent = p.name || p.email || '—';
@@ -1098,6 +1283,30 @@ function renderUserInfo() {
 
 // ── Navigation ────────────────────────────────────────────────────────
 let activeSectionId = 'dashboard';
+
+function updateBottomNavActiveState(id) {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === id);
+    });
+}
+
+window.toggleOrbMenu = function(forceState) {
+    const menu = document.getElementById('radial-menu');
+    const overlay = document.getElementById('menu-overlay');
+    const orb = document.getElementById('orb-toggle');
+    if (!menu || !overlay || !orb) return;
+
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : menu.hasAttribute('hidden');
+    if (shouldOpen) {
+        menu.removeAttribute('hidden');
+        overlay.removeAttribute('hidden');
+        orb.setAttribute('aria-expanded', 'true');
+    } else {
+        menu.setAttribute('hidden', '');
+        overlay.setAttribute('hidden', '');
+        orb.setAttribute('aria-expanded', 'false');
+    }
+};
 
 window.navigateTo = function(id) {
     // Hide all sections
@@ -1117,6 +1326,8 @@ window.navigateTo = function(id) {
     document.getElementById('page-title').textContent = labels[id] || id;
 
     activeSectionId = id;
+    updateBottomNavActiveState(id);
+    toggleOrbMenu(false);
     loadSection(id);
 };
 
