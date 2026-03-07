@@ -1265,6 +1265,7 @@ function buildBottomNav() {
         btn.className = 'nav-btn';
         btn.dataset.section = item.id;
         btn.innerHTML = `<span class="icon">${item.icon}</span><span>${item.label}</span>`;
+        btn.setAttribute('aria-label', `Go to ${item.label}`);
         btn.addEventListener('click', () => navigateTo(item.id));
         nav.appendChild(btn);
     });
@@ -1290,6 +1291,32 @@ function updateBottomNavActiveState(id) {
     });
 }
 
+function setupRadialMenuNavigation() {
+    const items = Array.from(document.querySelectorAll('.radial-item'));
+    if (!items.length) return;
+    items.forEach((item, index) => {
+        item.addEventListener('keydown', event => {
+            if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                return;
+            }
+            event.preventDefault();
+            let nextIndex = index;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                nextIndex = (index + 1) % items.length;
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                nextIndex = (index - 1 + items.length) % items.length;
+            } else if (event.key === 'Home') {
+                nextIndex = 0;
+            } else if (event.key === 'End') {
+                nextIndex = items.length - 1;
+            }
+            items[nextIndex].focus();
+        });
+    });
+}
+
+setupRadialMenuNavigation();
+
 window.toggleOrbMenu = function(forceState) {
     const menu = document.getElementById('radial-menu');
     const overlay = document.getElementById('menu-overlay');
@@ -1302,6 +1329,7 @@ window.toggleOrbMenu = function(forceState) {
         menu.removeAttribute('hidden');
         overlay.removeAttribute('hidden');
         orb.setAttribute('aria-expanded', 'true');
+        orb.setAttribute('aria-label', 'Close quick actions');
         const firstItem = menu.querySelector('.radial-item');
         if (firstItem) {
             requestAnimationFrame(() => firstItem.focus());
@@ -1310,6 +1338,7 @@ window.toggleOrbMenu = function(forceState) {
         menu.setAttribute('hidden', '');
         overlay.setAttribute('hidden', '');
         orb.setAttribute('aria-expanded', 'false');
+        orb.setAttribute('aria-label', 'Open quick actions');
         orb.focus();
     }
 };
