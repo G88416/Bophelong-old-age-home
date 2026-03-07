@@ -25,6 +25,7 @@
             --bottom-nav-height: 72px;
             --orb-gap: 24px;
             --orb-gap-compact: 16px;
+            --glass-background: rgba(15, 23, 42, 0.45);
             --z-bottom-nav: 900;
             --z-menu-overlay: 940;
             --z-orb: 950;
@@ -383,7 +384,7 @@
             left: 0;
             right: 0;
             height: var(--bottom-nav-height);
-            background: rgba(15, 23, 42, 0.45);
+            background: var(--glass-background);
             backdrop-filter: blur(16px);
             border-top: 1px solid rgba(255,255,255,0.08);
             z-index: var(--z-bottom-nav);
@@ -450,7 +451,7 @@
         }
 
         @keyframes breathe {
-            0%,100% { transform: scale(1); }
+            0%, 100% { transform: scale(1); }
             50%     { transform: scale(1.06); }
         }
 
@@ -1253,9 +1254,26 @@ let radialMenuItems = [];
 let activeRadialIndex = 0;
 
 function resetOrbMenuState() {
+    const menu = document.getElementById('radial-menu');
+    const orb = document.getElementById('orb-toggle');
+    const overlay = document.getElementById('menu-overlay');
+    if (orb) orb.removeEventListener('click', handleOrbToggle);
+    if (overlay) overlay.removeEventListener('click', handleOverlayClick);
+    if (menu) {
+        menu.setAttribute('hidden', '');
+        menu.innerHTML = '';
+    }
     orbMenuInitialized = false;
     radialMenuItems = [];
     activeRadialIndex = 0;
+}
+
+function handleOrbToggle() {
+    window.toggleOrbMenu();
+}
+
+function handleOverlayClick() {
+    window.toggleOrbMenu(false);
 }
 
 function buildSidebar() {
@@ -1322,8 +1340,8 @@ function initializeOrbMenu() {
         menu.appendChild(btn);
     });
 
-    orb.addEventListener('click', () => toggleOrbMenu());
-    overlay.addEventListener('click', () => toggleOrbMenu(false));
+    orb.addEventListener('click', handleOrbToggle);
+    overlay.addEventListener('click', handleOverlayClick);
     radialMenuItems = Array.from(menu.querySelectorAll('.radial-item'));
     activeRadialIndex = 0;
     resetRadialTabIndex();
@@ -1407,7 +1425,6 @@ window.toggleOrbMenu = function(forceState) {
         orb.setAttribute('aria-label', 'Close quick actions');
         const firstItem = menu.querySelector('.radial-item');
         if (firstItem) {
-            activeRadialIndex = 0;
             setRadialTabIndex(0);
             requestAnimationFrame(() => firstItem.focus());
         }
