@@ -1252,20 +1252,24 @@ const ORB_ACTIONS = [
 let orbMenuInitialized = false;
 let radialMenuItems = [];
 let activeRadialIndex = 0;
+let isOrbMenuOpen = false;
 
 function resetOrbMenuState() {
-    const menu = document.getElementById('radial-menu');
-    const orb = document.getElementById('orb-toggle');
-    const overlay = document.getElementById('menu-overlay');
-    if (orb) orb.removeEventListener('click', handleOrbToggle);
-    if (overlay) overlay.removeEventListener('click', handleOverlayClick);
-    if (menu) {
-        menu.setAttribute('hidden', '');
-        menu.innerHTML = '';
+    if (orbMenuInitialized) {
+        const menu = document.getElementById('radial-menu');
+        const orb = document.getElementById('orb-toggle');
+        const overlay = document.getElementById('menu-overlay');
+        if (orb) orb.removeEventListener('click', handleOrbToggle);
+        if (overlay) overlay.removeEventListener('click', handleOverlayClick);
+        if (menu) {
+            menu.setAttribute('hidden', '');
+            menu.innerHTML = '';
+        }
     }
     orbMenuInitialized = false;
     radialMenuItems = [];
     activeRadialIndex = 0;
+    isOrbMenuOpen = false;
 }
 
 function handleOrbToggle() {
@@ -1390,6 +1394,14 @@ function setupRadialMenuNavigation() {
                 toggleOrbMenu(false);
                 return;
             }
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                const direction = event.shiftKey ? -1 : 1;
+                let nextIndex = (index + direction + radialMenuItems.length) % radialMenuItems.length;
+                setRadialTabIndex(nextIndex);
+                radialMenuItems[nextIndex].focus();
+                return;
+            }
             if (!RADIAL_MENU_NAV_KEYS.includes(event.key)) {
                 return;
             }
@@ -1416,13 +1428,13 @@ window.toggleOrbMenu = function(forceState) {
     const orb = document.getElementById('orb-toggle');
     if (!menu || !overlay || !orb) return;
 
-    const isExpanded = orb.getAttribute('aria-expanded') === 'true';
-    const shouldOpen = typeof forceState === 'boolean' ? forceState : !isExpanded;
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !isOrbMenuOpen;
     if (shouldOpen) {
         menu.removeAttribute('hidden');
         overlay.removeAttribute('hidden');
         orb.setAttribute('aria-expanded', 'true');
         orb.setAttribute('aria-label', 'Close quick actions');
+        isOrbMenuOpen = true;
         const firstItem = menu.querySelector('.radial-item');
         if (firstItem) {
             setRadialTabIndex(0);
@@ -1433,6 +1445,7 @@ window.toggleOrbMenu = function(forceState) {
         overlay.setAttribute('hidden', '');
         orb.setAttribute('aria-expanded', 'false');
         orb.setAttribute('aria-label', 'Open quick actions');
+        isOrbMenuOpen = false;
         resetRadialTabIndex();
         orb.focus();
     }
@@ -1457,8 +1470,7 @@ window.navigateTo = function(id) {
 
     activeSectionId = id;
     updateBottomNavActiveState(id);
-    const orb = document.getElementById('orb-toggle');
-    if (orb && orb.getAttribute('aria-expanded') === 'true') {
+    if (isOrbMenuOpen) {
         toggleOrbMenu(false);
     }
     loadSection(id);
