@@ -16,3 +16,14 @@ inside the portal. The admin must supply you with:
 
 If your account is inactive or you cannot sign in, contact your administrator to
 activate or reset your access.
+
+## Firebase rules and indexes
+Security rules and index definitions live in the repository root:
+- `firestore.rules`
+- `storage.rules`
+- `firestore.indexes.json`
+
+Deploy them with the Firebase CLI:
+```
+firebase deploy --only firestore:rules,firestore:indexes,storage
+```
