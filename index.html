@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Serene Old Age Home Admin — Login</title>
+    <title>Bophelong Olg Age Home Admin — Login</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -377,7 +377,7 @@
     <div class="login-wrapper">
         <div class="login-logo">
             <div class="icon">🏡</div>
-            <h1>Serene Old Age Home</h1>
+            <h1>Bophelong Olg Age Home</h1>
             <p>Staff &amp; Administration Portal</p>
         </div>
         <div class="login-card">
@@ -403,7 +403,7 @@
     <aside class="sidebar">
         <div class="sidebar-logo">
             <div class="s-icon">🏡</div>
-            <h2>Serene</h2>
+            <h2>Bophelong Olg Age Home</h2>
             <p>Admin Portal</p>
         </div>
         <nav id="sidebar-nav">
@@ -865,6 +865,8 @@
 <script type="module">
 import { initializeApp, getApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+import { getAnalytics }
+    from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
@@ -873,15 +875,17 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
-    apiKey:            "AIzaSyAK1cTCLizp2Vh3IIRrvkrKCB5jfOjUWTo",
-    authDomain:        "plucky-hue-480011-h4.firebaseapp.com",
-    projectId:         "plucky-hue-480011-h4",
-    storageBucket:     "plucky-hue-480011-h4.firebasestorage.app",
-    messagingSenderId: "747481191566",
-    appId:             "1:747481191566:web:1f5f8f93a3a83d4ecd65df"
+    apiKey:            "AIzaSyBT188VM589F23kNC28bRyLH5k5j3f4q1g",
+    authDomain:        "bophelong-old-age-home.firebaseapp.com",
+    projectId:         "bophelong-old-age-home",
+    storageBucket:     "bophelong-old-age-home.firebasestorage.app",
+    messagingSenderId: "765188654906",
+    appId:             "1:765188654906:web:97d795de05a06758fdb203",
+    measurementId:     "G-4W5T8XN1D0"
 };
 
 const app  = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
