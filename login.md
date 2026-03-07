@@ -8,6 +8,17 @@ credentials stored in this repository.**
 2. Enter the email address and password provided by your administrator.
 3. Click **Sign In**.
 
+## First-time admin setup (temporary login)
+If no admin accounts exist yet, use the **First-time setup: Create admin** button on the login screen.
+
+Before using it, **set a private bootstrap code** and deploy matching Firestore rules:
+1. Update `BOOTSTRAP_CODE` in `index.html` to a private code.
+2. Update `bootstrapCode()` in `firestore.rules` to the same value.
+3. Deploy the rules (`firebase deploy --only firestore:rules`).
+
+Then use the setup form to create your first admin user. After you create permanent users,
+change the bootstrap code again (or remove the setup path) and redeploy the rules.
+
 ## Need an account?
 Ask an administrator to create a user account from the **Staff & Users** section
 inside the portal. The admin must supply you with:

@@ -94,6 +94,11 @@
             display: block; text-align: center; margin-top: 16px;
             color: #94a3b8; font-size: .82rem; text-decoration: none;
         }
+        .login-alt-btn {
+            width: 100%;
+            justify-content: center;
+            margin-top: 12px;
+        }
 
         /* ═══════════════════════════════════════════════════════
            APP SHELL  (hidden until logged in)
@@ -551,6 +556,7 @@
             </div>
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
+            <button class="btn btn-ghost login-alt-btn" type="button" onclick="openModal('bootstrap')">First-time setup: Create admin</button>
         </div>
         <p class="login-help">Need access? Contact your administrator for your login credentials.</p>
     </div>
@@ -884,6 +890,46 @@
     </div>
 </div>
 
+<!-- Bootstrap admin modal -->
+<div class="modal-overlay" id="modal-bootstrap" hidden>
+    <div class="modal">
+        <h3>🧭 Temporary Admin Setup</h3>
+        <div class="alert alert-warn">
+            Use this only for first-time setup. After creating your permanent admin,
+            change the bootstrap code and redeploy your Firestore rules.
+        </div>
+        <div class="form-group"><label>Full Name *</label><input id="b-name" placeholder="Full name"></div>
+        <div class="form-group"><label>Email Address *</label><input id="b-email" type="email" placeholder="admin@example.com"></div>
+        <div class="form-group"><label>Department</label><input id="b-dept" placeholder="e.g. Administration"></div>
+        <div class="form-group">
+            <label>Setup Code *</label>
+            <div class="pw-wrap">
+                <input id="b-code" type="password" placeholder="Enter setup code" autocomplete="off">
+                <button type="button" class="pw-toggle" onclick="togglePw('b-code',this)" title="Show/hide code" aria-label="Show setup code">👁</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Password *</label>
+            <div class="pw-wrap">
+                <input id="b-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password">
+                <button type="button" class="pw-toggle" onclick="togglePw('b-password',this)" title="Show/hide password" aria-label="Show password">👁</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Confirm Password *</label>
+            <div class="pw-wrap">
+                <input id="b-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
+                <button type="button" class="pw-toggle" onclick="togglePw('b-confirm',this)" title="Show/hide password" aria-label="Show password">👁</button>
+            </div>
+        </div>
+        <div class="modal-msg" id="modal-bootstrap-msg"></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('bootstrap')">Cancel</button>
+            <button class="btn btn-primary" id="setup-admin-btn" onclick="setupAdmin()">Create Admin</button>
+        </div>
+    </div>
+</div>
+
 <!-- Task modal -->
 <div class="modal-overlay" id="modal-task" hidden>
     <div class="modal">
@@ -1040,7 +1086,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
     getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc,
-    query, orderBy, limit, serverTimestamp, where, getDoc
+    query, orderBy, limit, serverTimestamp, where, getDoc, deleteField
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1057,6 +1103,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const BOOTSTRAP_CODE = 'CHANGE_ME_SETUP_CODE';
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1064,6 +1111,8 @@ let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
+let bootstrapCreatePromise = null;
+let bootstrapUid = null;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1161,6 +1210,61 @@ window.doLogin = async function() {
     }
 };
 
+window.setupAdmin = async function() {
+    const name      = document.getElementById('b-name').value.trim();
+    const email     = document.getElementById('b-email').value.trim();
+    const dept      = document.getElementById('b-dept').value.trim();
+    const setupCode = document.getElementById('b-code').value.trim();
+    const password  = document.getElementById('b-password').value;
+    const confirm   = document.getElementById('b-confirm').value;
+
+    if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
+    if (!setupCode) { modalMsg('bootstrap', 'Setup code is required.', 'error'); return; }
+    if (BOOTSTRAP_CODE === 'CHANGE_ME_SETUP_CODE') {
+        modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
+        return;
+    }
+    if (setupCode !== BOOTSTRAP_CODE) { modalMsg('bootstrap', 'Invalid setup code.', 'error'); return; }
+    if (!password) { modalMsg('bootstrap', 'A password is required.', 'error'); return; }
+    if (password.length < 8) { modalMsg('bootstrap', 'Password must be at least 8 characters.', 'error'); return; }
+    if (password !== confirm) { modalMsg('bootstrap', 'Passwords do not match.', 'error'); return; }
+
+    const btn = document.getElementById('setup-admin-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating…';
+
+    try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const newUid = cred.user.uid;
+        bootstrapUid = newUid;
+        bootstrapCreatePromise = setDoc(doc(db, 'users', newUid), {
+            name, email, dept, role: 'admin', active: true, uid: newUid,
+            createdAt: serverTimestamp(), bootstrapCode: setupCode
+        });
+        await bootstrapCreatePromise;
+        await updateDoc(doc(db, 'users', newUid), { bootstrapCode: deleteField() });
+        bootstrapCreatePromise = null;
+        bootstrapUid = null;
+        closeModal('bootstrap');
+        toast('✅ Admin account created. You are now signed in.', 4000);
+    } catch (e) {
+        bootstrapCreatePromise = null;
+        bootstrapUid = null;
+        const msgs = {
+            'auth/email-already-in-use': 'An account with that email already exists.',
+            'auth/invalid-email':        'Invalid email address.',
+            'auth/weak-password':        'Password is too weak. Use at least 8 characters.',
+            'auth/operation-not-allowed': 'Email/password login is not enabled in Firebase.',
+            'permission-denied':         'Bootstrap setup is blocked by Firestore rules.'
+        };
+        modalMsg('bootstrap', msgs[e.code] || 'Error: ' + e.message, 'error');
+        try { await signOut(auth); } catch (err) { /* ignore */ }
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Admin';
+    }
+};
+
 // Allow pressing Enter to submit
 ['l-email','l-password'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => {
@@ -1196,6 +1300,10 @@ onAuthStateChanged(auth, async (user) => {
 async function loadProfile(user) {
     // Try UID-keyed doc first
     let snap = await getDoc(doc(db, 'users', user.uid));
+    if (!snap.exists() && bootstrapCreatePromise && bootstrapUid === user.uid) {
+        await bootstrapCreatePromise;
+        snap = await getDoc(doc(db, 'users', user.uid));
+    }
     if (!snap.exists()) {
         // Fallback: find by email (legacy data)
         const q = query(collection(db, 'users'), where('email', '==', user.email));
@@ -2011,6 +2119,18 @@ window.openModal  = function(name) {
         });
         document.querySelectorAll('.pw-toggle').forEach(b => b.textContent = '👁');
         document.getElementById('modal-user-msg').className = 'modal-msg';
+    }
+    if (name === 'bootstrap') {
+        ['b-name','b-email','b-dept','b-code','b-password','b-confirm'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        ['b-code','b-password','b-confirm'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.type = 'password';
+        });
+        document.querySelectorAll('#modal-bootstrap .pw-toggle').forEach(b => b.textContent = '👁');
+        document.getElementById('modal-bootstrap-msg').className = 'modal-msg';
     }
 };
 window.closeModal = function(name) {
