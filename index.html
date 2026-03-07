@@ -22,6 +22,9 @@
             --red:     #dc2626;
             --amber:   #d97706;
             --cyan:    #0891b2;
+            --bottom-nav-height: 72px;
+            --orb-gap: 24px;
+            --orb-gap-compact: 16px;
         }
 
         /* ── Base ──────────────────────────────────────────────── */
@@ -236,7 +239,7 @@
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.5);
             display: flex; align-items: center; justify-content: center;
-            z-index: 1000; padding: 20px;
+            z-index: 960; padding: 20px;
         }
         .modal-overlay[hidden] { display: none !important; }
         .modal {
@@ -375,7 +378,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 72px;
+            height: var(--bottom-nav-height);
             background: rgba(15, 23, 42, 0.45);
             backdrop-filter: blur(16px);
             border-top: 1px solid rgba(255,255,255,0.08);
@@ -422,7 +425,7 @@
         /* ── Floating Orb & Radial Menu ─────────────────────────────── */
         .orb-container {
             position: fixed;
-            bottom: 96px;         /* above bottom bar */
+            bottom: calc(var(--bottom-nav-height) + var(--orb-gap));
             right: 24px;
             z-index: 950;
         }
@@ -517,7 +520,7 @@
         }
 
         @media (max-width: 560px) {
-            .orb-container { right: 16px; bottom: 88px; }
+            .orb-container { right: 16px; bottom: calc(var(--bottom-nav-height) + var(--orb-gap-compact)); }
         }
     </style>
 </head>
@@ -1331,6 +1334,11 @@ function setupRadialMenuNavigation() {
     if (!items.length) return;
     items.forEach((item, index) => {
         item.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                toggleOrbMenu(false);
+                return;
+            }
             if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
                 return;
             }
