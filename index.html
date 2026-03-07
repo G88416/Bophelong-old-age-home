@@ -1103,7 +1103,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = '';
+const BOOTSTRAP_CODE = ''; // Set a strong code and keep it in sync with firestore.rules
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1284,7 +1284,7 @@ window.setupAdmin = async function() {
             'permission-denied':         'Bootstrap setup is blocked by Firestore rules.'
         };
         modalMsg('bootstrap', msgs[e.code] || 'Error: ' + e.message, 'error');
-        try { await signOut(auth); } catch (err) { /* ignore */ }
+        try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
     } finally {
         btn.disabled = false;
         btn.textContent = 'Create Admin';
