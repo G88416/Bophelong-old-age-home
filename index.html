@@ -25,6 +25,7 @@
             --bottom-nav-height: 72px;
             --orb-gap: 24px;
             --glass-background: rgba(15, 23, 42, 0.45);
+            --mobile-content-padding: calc(var(--bottom-nav-height) + 48px);
             --z-bottom-nav: 900;
             --z-menu-overlay: 940;
             --z-orb: 950;
@@ -512,7 +513,7 @@
         .menu-overlay[hidden] { display: none; }
 
         @media (max-width: 900px) {
-            .content { padding-bottom: 120px; }
+            .content { padding-bottom: var(--mobile-content-padding); }
         }
 
         @media (min-width: 900px) {
@@ -525,7 +526,7 @@
 
         @media (max-width: 560px) {
             :root { --orb-gap: 16px; }
-            .orb-container { right: 16px; bottom: calc(var(--bottom-nav-height) + var(--orb-gap)); }
+            .orb-container { right: 16px; }
         }
     </style>
 </head>
@@ -1259,8 +1260,8 @@ function resetOrbMenuState() {
         const menu = document.getElementById('radial-menu');
         const orb = document.getElementById('orb-toggle');
         const overlay = document.getElementById('menu-overlay');
-        if (orb) orb.removeEventListener('click', window.toggleOrbMenu);
-        if (overlay) overlay.removeEventListener('click', handleOverlayClick);
+        if (orb) orb.removeEventListener('click', orbToggleHandler);
+        if (overlay) overlay.removeEventListener('click', overlayClickHandler);
         if (menu) {
             menu.setAttribute('hidden', '');
             menu.innerHTML = '';
@@ -1272,9 +1273,8 @@ function resetOrbMenuState() {
     isOrbMenuOpen = false;
 }
 
-function handleOverlayClick() {
-    window.toggleOrbMenu(false);
-}
+const orbToggleHandler = () => window.toggleOrbMenu();
+const overlayClickHandler = () => window.toggleOrbMenu(false);
 
 function buildSidebar() {
     const role = currentProfile.role;
@@ -1340,8 +1340,8 @@ function initializeOrbMenu() {
         menu.appendChild(btn);
     });
 
-    orb.addEventListener('click', window.toggleOrbMenu);
-    overlay.addEventListener('click', handleOverlayClick);
+    orb.addEventListener('click', orbToggleHandler);
+    overlay.addEventListener('click', overlayClickHandler);
     radialMenuItems = Array.from(menu.querySelectorAll('.radial-item'));
     activeRadialIndex = 0;
     resetRadialTabIndex();
