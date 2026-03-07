@@ -1291,6 +1291,8 @@ function initializeOrbMenu() {
     if (!menu || !orb || !overlay) return;
 
     menu.innerHTML = '';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Quick actions');
     ORB_ACTIONS.forEach(action => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1298,6 +1300,8 @@ function initializeOrbMenu() {
         btn.style.setProperty('--angle', `${action.angle}deg`);
         btn.textContent = action.label;
         btn.setAttribute('aria-label', action.ariaLabel);
+        btn.setAttribute('role', 'menuitem');
+        btn.setAttribute('tabindex', '-1');
         btn.addEventListener('click', () => {
             openModal(action.modal);
             toggleOrbMenu(false);
@@ -1353,6 +1357,9 @@ function setupRadialMenuNavigation() {
             } else if (event.key === 'End') {
                 nextIndex = items.length - 1;
             }
+            items.forEach((btn, idx) => {
+                btn.tabIndex = idx === nextIndex ? 0 : -1;
+            });
             items[nextIndex].focus();
         });
     });
@@ -1373,6 +1380,9 @@ window.toggleOrbMenu = function(forceState) {
         orb.setAttribute('aria-label', 'Close quick actions');
         const firstItem = menu.querySelector('.radial-item');
         if (firstItem) {
+            menu.querySelectorAll('.radial-item').forEach((btn, idx) => {
+                btn.tabIndex = idx === 0 ? 0 : -1;
+            });
             requestAnimationFrame(() => firstItem.focus());
         }
     } else {
@@ -1380,6 +1390,9 @@ window.toggleOrbMenu = function(forceState) {
         overlay.setAttribute('hidden', '');
         orb.setAttribute('aria-expanded', 'false');
         orb.setAttribute('aria-label', 'Open quick actions');
+        menu.querySelectorAll('.radial-item').forEach(btn => {
+            btn.tabIndex = -1;
+        });
         orb.focus();
     }
 };
