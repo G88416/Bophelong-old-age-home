@@ -1137,6 +1137,19 @@ async function logActivity(msg) {
     } catch (e) { console.error('logActivity failed:', e); }
 }
 
+async function cleanupBootstrapCode(docRef, notify = false) {
+    try {
+        await updateDoc(docRef, { bootstrapCode: deleteField() });
+        return true;
+    } catch (cleanupErr) {
+        console.warn('Bootstrap cleanup failed:', cleanupErr);
+        if (notify) {
+            toast('Admin created, but bootstrap cleanup failed. Remove bootstrapCode manually.', 6000);
+        }
+        return false;
+    }
+}
+
 window.togglePw = function(id, btn) {
     const input = document.getElementById(id);
     if (input.type === 'password') {
@@ -1225,10 +1238,6 @@ window.setupAdmin = async function() {
     const confirm   = document.getElementById('b-confirm').value;
 
     if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-        modalMsg('bootstrap', 'Enter a valid email address.', 'error');
-        return;
-    }
     if (!BOOTSTRAP_CODE) {
         modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
         return;
@@ -1259,12 +1268,7 @@ window.setupAdmin = async function() {
             });
         })();
         await bootstrapCreatePromise;
-        try {
-            await updateDoc(doc(db, 'users', newUid), { bootstrapCode: deleteField() });
-        } catch (cleanupErr) {
-            console.warn('Bootstrap cleanup failed:', cleanupErr);
-            toast('Admin created, but bootstrap cleanup failed. Remove bootstrapCode manually.', 6000);
-        }
+        await cleanupBootstrapCode(doc(db, 'users', newUid), true);
         bootstrapCreatePromise = null;
         bootstrapUid = null;
         closeModal('bootstrap');
@@ -1336,12 +1340,8 @@ async function loadProfile(user) {
     const data = snap.data();
     if (!data.active) throw new Error('inactive');
     if (data.bootstrapCode && data.role === 'admin') {
-        try {
-            await updateDoc(snap.ref, { bootstrapCode: deleteField() });
-            data.bootstrapCode = undefined;
-        } catch (cleanupErr) {
-            console.warn('Bootstrap cleanup failed:', cleanupErr);
-        }
+        const cleaned = await cleanupBootstrapCode(snap.ref);
+        if (cleaned) data.bootstrapCode = undefined;
     }
     currentProfile = data;
 }
