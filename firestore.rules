@@ -15,6 +15,10 @@ service cloud.firestore {
       return ['name','email','dept','role','active','uid','bootstrapCode','createdAt'];
     }
 
+    function isBootstrapLocked() {
+      return exists(/databases/$(database)/documents/config/bootstrap);
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -41,7 +45,7 @@ service cloud.firestore {
       return isSignedIn()
         && request.auth.uid == userId
         && bootstrapCode() != 'CHANGE_ME_BEFORE_DEPLOYMENT'
-        && !exists(/databases/$(database)/documents/config/bootstrap)
+        && !isBootstrapLocked()
         && request.resource.data.keys().hasAll(bootstrapKeys())
         && request.resource.data.keys().hasOnly(bootstrapKeys())
         && request.resource.data.uid == request.auth.uid
@@ -60,7 +64,7 @@ service cloud.firestore {
 
     match /config/bootstrap {
       allow read: if isAdmin();
-      allow create: if isAdmin() && !exists(/databases/$(database)/documents/config/bootstrap);
+      allow create: if isAdmin() && !isBootstrapLocked();
       allow update, delete: if false;
     }
 

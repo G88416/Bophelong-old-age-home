@@ -1104,7 +1104,8 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Rotate after first use; never deploy with the default value.
-const BOOTSTRAP_CLEANUP_RETRY_ATTEMPTS = 2;
+const BOOTSTRAP_CLEANUP_MAX_ATTEMPTS = 2;
+const BOOTSTRAP_CLEANUP_DELAY_MS = 200;
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1116,8 +1117,12 @@ let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 const bootstrapCleanupAttempted = new Set();
 
+function isBootstrapConfigured() {
+    return BOOTSTRAP_CODE && BOOTSTRAP_CODE !== 'CHANGE_ME_BEFORE_DEPLOYMENT';
+}
+
 const bootstrapBtn = document.getElementById('bootstrap-btn');
-if (bootstrapBtn && (!BOOTSTRAP_CODE || BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT')) {
+if (bootstrapBtn && !isBootstrapConfigured()) {
     bootstrapBtn.disabled = true;
     bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
     const msgEl = document.getElementById('login-msg');
@@ -1144,12 +1149,15 @@ async function logActivity(msg) {
 
 async function cleanupBootstrapCode(docRef, notify = false) {
     let lastErr;
-    for (let attempt = 0; attempt < BOOTSTRAP_CLEANUP_RETRY_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= BOOTSTRAP_CLEANUP_MAX_ATTEMPTS; attempt++) {
         try {
             await updateDoc(docRef, { bootstrapCode: deleteField() });
             return true;
         } catch (cleanupErr) {
             lastErr = cleanupErr;
+            if (attempt < BOOTSTRAP_CLEANUP_MAX_ATTEMPTS) {
+                await new Promise(resolve => setTimeout(resolve, BOOTSTRAP_CLEANUP_DELAY_MS * attempt));
+            }
         }
     }
     console.warn('Bootstrap cleanup failed:', lastErr);
@@ -1247,7 +1255,7 @@ window.setupAdmin = async function() {
     const confirm   = document.getElementById('b-confirm').value;
 
     if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
-    if (!BOOTSTRAP_CODE || BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT') {
+    if (!isBootstrapConfigured()) {
         modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
         return;
     }
@@ -1298,7 +1306,7 @@ window.setupAdmin = async function() {
         if (createdUser) {
             try { await deleteUser(createdUser); } catch (cleanupErr) {
                 console.warn('Bootstrap account cleanup failed:', cleanupErr);
-                toast('Bootstrap account created without profile. Delete it in Firebase Auth.', 7000);
+                toast('Bootstrap account created without a profile. Delete it in Firebase Auth or contact support.', 7000);
             }
         }
         try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
