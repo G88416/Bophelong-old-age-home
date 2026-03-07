@@ -90,11 +90,10 @@
         }
         .login-msg.error   { background: #fee2e2; color: #b91c1c; display: block; }
         .login-msg.info    { background: #dbeafe; color: #1d4ed8; display: block; }
-        .setup-link {
+        .login-help {
             display: block; text-align: center; margin-top: 16px;
             color: #94a3b8; font-size: .82rem; text-decoration: none;
         }
-        .setup-link:hover { color: #cbd5e1; }
 
         /* ═══════════════════════════════════════════════════════
            APP SHELL  (hidden until logged in)
@@ -553,7 +552,7 @@
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
         </div>
-        <a href="setup.html" class="setup-link">First-time setup →</a>
+        <p class="login-help">Need access? Contact your administrator for your login credentials.</p>
     </div>
 </div>
 
