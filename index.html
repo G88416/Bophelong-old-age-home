@@ -1082,7 +1082,7 @@ import { initializeApp, getApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, deleteUser }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
     getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc,
@@ -1103,7 +1103,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = ''; // Set a strong code and keep it in sync with firestore.rules
+const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Set a strong code and keep it in sync with firestore.rules
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1115,7 +1115,7 @@ let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 
 const bootstrapBtn = document.getElementById('bootstrap-btn');
-if (bootstrapBtn && !BOOTSTRAP_CODE) {
+if (bootstrapBtn && (!BOOTSTRAP_CODE || BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT')) {
     bootstrapBtn.disabled = true;
     bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
 }
@@ -1238,7 +1238,7 @@ window.setupAdmin = async function() {
     const confirm   = document.getElementById('b-confirm').value;
 
     if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
-    if (!BOOTSTRAP_CODE) {
+    if (!BOOTSTRAP_CODE || BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT') {
         modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
         return;
     }
@@ -1254,9 +1254,11 @@ window.setupAdmin = async function() {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Creating…';
 
+    let createdUser = null;
     try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        const newUid = cred.user.uid;
+        createdUser = cred.user;
+        const newUid = createdUser.uid;
         bootstrapUid = newUid;
         bootstrapCreatePromise = (async () => {
             await setDoc(doc(db, 'users', newUid), {
@@ -1284,6 +1286,11 @@ window.setupAdmin = async function() {
             'permission-denied':         'Bootstrap setup is blocked by Firestore rules.'
         };
         modalMsg('bootstrap', msgs[e.code] || 'Error: ' + e.message, 'error');
+        if (createdUser) {
+            try { await deleteUser(createdUser); } catch (cleanupErr) {
+                console.warn('Bootstrap account cleanup failed:', cleanupErr);
+            }
+        }
         try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
     } finally {
         btn.disabled = false;
