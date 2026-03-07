@@ -23,6 +23,7 @@ service cloud.firestore {
     function isActivityPayload() {
       return request.resource.data.keys().hasAll(['msg', 'date', 'uid'])
         && request.resource.data.msg is string
+        && request.resource.data.date is timestamp
         && request.resource.data.uid == request.auth.uid;
     }
 
@@ -51,7 +52,7 @@ service cloud.firestore {
 
     match /leaves/{leaveId} {
       allow read: if isAdmin()
-        || (isSignedIn() && resource.data.staffUid == request.auth.uid);
+        || (isSignedIn() && resource != null && resource.data.staffUid == request.auth.uid);
       allow create: if isSignedIn()
         && hasStaffUid(request.resource.data)
         && request.resource.data.staffUid == request.auth.uid;
