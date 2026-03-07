@@ -1104,6 +1104,7 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Rotate after first use; never deploy with the default value.
+const BOOTSTRAP_CLEANUP_RETRY_ATTEMPTS = 2;
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1119,6 +1120,9 @@ const bootstrapBtn = document.getElementById('bootstrap-btn');
 if (bootstrapBtn && (!BOOTSTRAP_CODE || BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT')) {
     bootstrapBtn.disabled = true;
     bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
+    const msgEl = document.getElementById('login-msg');
+    msgEl.textContent = 'Bootstrap setup is disabled until BOOTSTRAP_CODE is set.';
+    msgEl.className = 'login-msg info';
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -1140,7 +1144,7 @@ async function logActivity(msg) {
 
 async function cleanupBootstrapCode(docRef, notify = false) {
     let lastErr;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < BOOTSTRAP_CLEANUP_RETRY_ATTEMPTS; attempt++) {
         try {
             await updateDoc(docRef, { bootstrapCode: deleteField() });
             return true;
