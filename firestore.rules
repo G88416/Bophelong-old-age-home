@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && userDoc().exists()
+        && userDoc().data.get('active', false)
+        && userDoc().data.get('role', '') == 'admin';
+    }
+
+    function hasStaffUid(data) {
+      return data.keys().hasAll(['staffUid']);
+    }
+
+    function isActivityPayload() {
+      return request.resource.data.keys().hasAll(['msg', 'date', 'uid'])
+        && request.resource.data.msg is string
+        && request.resource.data.date is timestamp
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /activities/{activityId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && isActivityPayload();
+      allow update, delete: if isAdmin();
+    }
+
+    match /donations/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /income/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /expenditure/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /leaves/{leaveId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource != null && resource.data.staffUid == request.auth.uid);
+      allow create: if isSignedIn()
+        && hasStaffUid(request.resource.data)
+        && request.resource.data.staffUid == request.auth.uid;
+      allow update: if isAdmin()
+        && hasStaffUid(resource.data)
+        && hasStaffUid(request.resource.data)
+        && request.resource.data.staffUid == resource.data.staffUid;
+      allow delete: if isAdmin();
+    }
+
+    match /residents/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /tasks/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /medications/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
