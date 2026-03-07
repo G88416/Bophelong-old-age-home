@@ -804,12 +804,12 @@
         <div class="nav-items" id="bottom-nav-items"></div>
     </div>
     <div class="orb-container">
-        <button class="orb" id="orb-toggle" type="button" aria-label="Open quick actions" aria-expanded="false" onclick="toggleOrbMenu()">＋</button>
+        <button class="orb" id="orb-toggle" type="button" aria-label="Open quick actions" aria-expanded="false" aria-controls="radial-menu" onclick="toggleOrbMenu()">＋</button>
         <div class="radial-menu" id="radial-menu" hidden>
-            <button class="radial-item" style="--angle: -15deg" type="button" onclick="openModal('resident'); toggleOrbMenu(false);">+ Resident</button>
-            <button class="radial-item" style="--angle: -55deg" type="button" onclick="openModal('task'); toggleOrbMenu(false);">+ Task</button>
-            <button class="radial-item" style="--angle: -95deg" type="button" onclick="openModal('medication'); toggleOrbMenu(false);">+ Medication</button>
-            <button class="radial-item" style="--angle: -135deg" type="button" onclick="openModal('leave'); toggleOrbMenu(false);">+ Leave</button>
+            <button class="radial-item" style="--angle: -15deg" type="button" aria-label="Add resident" onclick="openModal('resident'); toggleOrbMenu(false);">+ Resident</button>
+            <button class="radial-item" style="--angle: -55deg" type="button" aria-label="Add task" onclick="openModal('task'); toggleOrbMenu(false);">+ Task</button>
+            <button class="radial-item" style="--angle: -95deg" type="button" aria-label="Add medication" onclick="openModal('medication'); toggleOrbMenu(false);">+ Medication</button>
+            <button class="radial-item" style="--angle: -135deg" type="button" aria-label="Add leave request" onclick="openModal('leave'); toggleOrbMenu(false);">+ Leave</button>
         </div>
     </div>
     <div class="menu-overlay" id="menu-overlay" hidden onclick="toggleOrbMenu(false)"></div>
@@ -1296,15 +1296,21 @@ window.toggleOrbMenu = function(forceState) {
     const orb = document.getElementById('orb-toggle');
     if (!menu || !overlay || !orb) return;
 
-    const shouldOpen = typeof forceState === 'boolean' ? forceState : menu.hasAttribute('hidden');
+    const isExpanded = orb.getAttribute('aria-expanded') === 'true';
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !isExpanded;
     if (shouldOpen) {
         menu.removeAttribute('hidden');
         overlay.removeAttribute('hidden');
         orb.setAttribute('aria-expanded', 'true');
+        const firstItem = menu.querySelector('.radial-item');
+        if (firstItem) {
+            requestAnimationFrame(() => firstItem.focus());
+        }
     } else {
         menu.setAttribute('hidden', '');
         overlay.setAttribute('hidden', '');
         orb.setAttribute('aria-expanded', 'false');
+        orb.focus();
     }
 };
 
