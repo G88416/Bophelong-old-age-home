@@ -22,6 +22,14 @@
             --red:     #dc2626;
             --amber:   #d97706;
             --cyan:    #0891b2;
+            --bottom-nav-height: 72px;
+            --orb-gap: 24px;
+            --glass-background: rgba(15, 23, 42, 0.45);
+            --mobile-content-padding: calc(var(--bottom-nav-height) + 48px);
+            --z-bottom-nav: 900;
+            --z-menu-overlay: 940;
+            --z-orb: 950;
+            --z-modal: 960;
         }
 
         /* ── Base ──────────────────────────────────────────────── */
@@ -236,7 +244,7 @@
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.5);
             display: flex; align-items: center; justify-content: center;
-            z-index: 200; padding: 20px;
+            z-index: var(--z-modal); padding: 20px;
         }
         .modal-overlay[hidden] { display: none !important; }
         .modal {
@@ -368,6 +376,158 @@
             padding: 0; line-height: 1;
         }
         .pw-toggle:hover { color: var(--purple); }
+
+        /* ── Bottom Navigation ──────────────────────────────────────── */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--bottom-nav-height);
+            background: var(--glass-background);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            z-index: var(--z-bottom-nav);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 16px;
+        }
+
+        .nav-items {
+            display: flex;
+            gap: 8px;
+            max-width: 420px;
+            width: 100%;
+            justify-content: space-around;
+        }
+
+        .nav-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 11px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            transition: all 0.28s ease;
+        }
+
+        .nav-btn .icon {
+            font-size: 1.5rem;
+        }
+
+        .nav-btn.active,
+        .nav-btn:hover {
+            color: #22d3ee;
+            background: rgba(34, 211, 238, 0.12);
+            transform: translateY(-2px);
+        }
+
+        /* ── Floating Orb & Radial Menu ─────────────────────────────── */
+        .orb-container {
+            position: fixed;
+            bottom: calc(var(--bottom-nav-height) + var(--orb-gap));
+            right: 24px;
+            z-index: var(--z-orb);
+        }
+
+        .orb {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #22d3ee, #0891b2);
+            border: none;
+            color: white;
+            font-size: 2rem;
+            font-weight: bold;
+            box-shadow: 0 8px 32px rgba(34, 211, 238, 0.4);
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: breathe 4s infinite ease-in-out;
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); }
+            50%     { transform: scale(1.06); }
+        }
+
+        .orb:hover {
+            transform: scale(1.15) rotate(8deg);
+            box-shadow: 0 16px 48px rgba(34, 211, 238, 0.55);
+        }
+
+        .radial-menu {
+            position: absolute;
+            bottom: 50%;
+            right: 50%;
+            width: 280px;
+            height: 280px;
+            transform: translate(50%, 50%) scale(0);
+            transform-origin: bottom right;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+        }
+
+        .radial-menu[hidden] { display: none; }
+
+        .radial-menu:not([hidden]) {
+            transform: translate(50%, 50%) scale(1);
+            pointer-events: auto;
+        }
+
+        .radial-item {
+            position: absolute;
+            width: 110px;
+            height: 44px;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            color: white;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transform: rotate(var(--angle)) translateX(120px) rotate(calc(-1 * var(--angle)));
+            transition: all 0.35s ease;
+            cursor: pointer;
+        }
+
+        .radial-item:hover {
+            background: rgba(34, 211, 238, 0.25);
+            transform: rotate(var(--angle)) translateX(132px) rotate(calc(-1 * var(--angle))) scale(1.1);
+        }
+
+        .menu-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            z-index: var(--z-menu-overlay);
+        }
+
+        .menu-overlay[hidden] { display: none; }
+
+        @media (max-width: 900px) {
+            .content { padding-bottom: var(--mobile-content-padding); }
+        }
+
+        @media (min-width: 900px) {
+            .bottom-nav,
+            .orb-container,
+            .menu-overlay {
+                display: none;
+            }
+        }
+
+        @media (max-width: 560px) {
+            :root { --orb-gap: 16px; }
+            .orb-container { right: 16px; }
+        }
     </style>
 </head>
 <body>
@@ -649,6 +809,16 @@
 
         </div><!-- /content -->
     </main>
+    <div class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
+        <div class="nav-items" id="bottom-nav-items"></div>
+    </div>
+    <div class="orb-container">
+        <button class="orb" id="orb-toggle" type="button" aria-label="Open quick actions" aria-expanded="false" aria-controls="radial-menu">
+            <span aria-hidden="true">+</span>
+        </button>
+        <div class="radial-menu" id="radial-menu" hidden></div>
+    </div>
+    <div class="menu-overlay" id="menu-overlay" hidden></div>
 </div><!-- /app -->
 
 <!-- ═══════════════ MODALS ═══════════════ -->
@@ -1046,12 +1216,15 @@ function showLogin() {
     const btn = document.getElementById('login-btn');
     btn.disabled = false;
     btn.textContent = 'Sign In';
+    resetOrbMenuState();
 }
 
 function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     buildSidebar();
+    buildBottomNav();
+    initializeOrbMenu();
     renderUserInfo();
     updateClock();
     navigateTo('dashboard');
@@ -1070,6 +1243,39 @@ const NAV_ITEMS = [
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
 
+const ORB_ACTIONS = [
+    { modal: 'resident',   label: '+ Resident',   ariaLabel: 'Add resident',       angle: -15 },
+    { modal: 'task',       label: '+ Task',       ariaLabel: 'Add task',           angle: -55 },
+    { modal: 'medication', label: '+ Medication', ariaLabel: 'Add medication',     angle: -95 },
+    { modal: 'leave',      label: '+ Leave',      ariaLabel: 'Add leave request',  angle: -135 },
+];
+
+let orbMenuInitialized = false;
+let radialMenuItems = [];
+let activeRadialIndex = 0;
+let isOrbMenuOpen = false;
+
+function resetOrbMenuState() {
+    if (orbMenuInitialized) {
+        const menu = document.getElementById('radial-menu');
+        const orb = document.getElementById('orb-toggle');
+        const overlay = document.getElementById('menu-overlay');
+        if (orb) orb.removeEventListener('click', orbToggleHandler);
+        if (overlay) overlay.removeEventListener('click', overlayClickHandler);
+        if (menu) {
+            menu.setAttribute('hidden', '');
+            menu.innerHTML = '';
+        }
+    }
+    orbMenuInitialized = false;
+    radialMenuItems = [];
+    activeRadialIndex = 0;
+    isOrbMenuOpen = false;
+}
+
+const orbToggleHandler = () => window.toggleOrbMenu();
+const overlayClickHandler = () => window.toggleOrbMenu(false);
+
 function buildSidebar() {
     const role = currentProfile.role;
     const nav  = document.getElementById('sidebar-nav');
@@ -1087,6 +1293,62 @@ function buildSidebar() {
     });
 }
 
+function buildBottomNav() {
+    const nav = document.getElementById('bottom-nav-items');
+    if (!nav) return;
+    const role = currentProfile.role;
+    nav.innerHTML = '';
+
+    const visible = NAV_ITEMS.filter(n => n.roles.includes(role));
+    visible.forEach(item => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'nav-btn';
+        btn.dataset.section = item.id;
+        btn.innerHTML = `<span class="icon">${item.icon}</span><span>${item.label}</span>`;
+        btn.setAttribute('aria-label', `Go to ${item.label}`);
+        btn.addEventListener('click', () => navigateTo(item.id));
+        nav.appendChild(btn);
+    });
+
+    updateBottomNavActiveState(activeSectionId);
+}
+
+function initializeOrbMenu() {
+    if (orbMenuInitialized) return;
+    const menu = document.getElementById('radial-menu');
+    const orb = document.getElementById('orb-toggle');
+    const overlay = document.getElementById('menu-overlay');
+    if (!menu || !orb || !overlay) return;
+
+    menu.innerHTML = '';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Quick actions');
+    ORB_ACTIONS.forEach(action => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'radial-item';
+        btn.style.setProperty('--angle', `${action.angle}deg`);
+        btn.textContent = action.label;
+        btn.setAttribute('aria-label', action.ariaLabel);
+        btn.setAttribute('role', 'menuitem');
+        btn.tabIndex = -1;
+        btn.addEventListener('click', () => {
+            openModal(action.modal);
+            toggleOrbMenu(false);
+        });
+        menu.appendChild(btn);
+    });
+
+    orb.addEventListener('click', orbToggleHandler);
+    overlay.addEventListener('click', overlayClickHandler);
+    radialMenuItems = Array.from(menu.querySelectorAll('.radial-item'));
+    activeRadialIndex = 0;
+    resetRadialTabIndex();
+    setupRadialMenuNavigation();
+    orbMenuInitialized = true;
+}
+
 function renderUserInfo() {
     const p = currentProfile;
     document.getElementById('user-name').textContent = p.name || p.email || '—';
@@ -1098,6 +1360,92 @@ function renderUserInfo() {
 
 // ── Navigation ────────────────────────────────────────────────────────
 let activeSectionId = 'dashboard';
+const RADIAL_MENU_NAV_KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
+
+function updateBottomNavActiveState(id) {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === id);
+    });
+}
+
+function setRadialTabIndex(nextIndex) {
+    if (!radialMenuItems.length) return;
+    radialMenuItems[activeRadialIndex].tabIndex = -1;
+    radialMenuItems[nextIndex].tabIndex = 0;
+    activeRadialIndex = nextIndex;
+}
+
+function resetRadialTabIndex() {
+    radialMenuItems.forEach(btn => {
+        btn.tabIndex = -1;
+    });
+}
+
+function setupRadialMenuNavigation() {
+    if (!radialMenuItems.length) return;
+    radialMenuItems.forEach((item, index) => {
+        item.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                toggleOrbMenu(false);
+                return;
+            }
+            if (event.key === 'Tab') {
+                event.preventDefault();
+                const direction = event.shiftKey ? -1 : 1;
+                let nextIndex = (index + direction + radialMenuItems.length) % radialMenuItems.length;
+                setRadialTabIndex(nextIndex);
+                radialMenuItems[nextIndex].focus();
+                return;
+            }
+            if (!RADIAL_MENU_NAV_KEYS.includes(event.key)) {
+                return;
+            }
+            event.preventDefault();
+            let nextIndex = index;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                nextIndex = (index + 1) % radialMenuItems.length;
+            } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                nextIndex = (index - 1 + radialMenuItems.length) % radialMenuItems.length;
+            } else if (event.key === 'Home') {
+                nextIndex = 0;
+            } else if (event.key === 'End') {
+                nextIndex = radialMenuItems.length - 1;
+            }
+            setRadialTabIndex(nextIndex);
+            radialMenuItems[nextIndex].focus();
+        });
+    });
+}
+
+window.toggleOrbMenu = function(forceState) {
+    const menu = document.getElementById('radial-menu');
+    const overlay = document.getElementById('menu-overlay');
+    const orb = document.getElementById('orb-toggle');
+    if (!menu || !overlay || !orb) return;
+
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : !isOrbMenuOpen;
+    if (shouldOpen) {
+        menu.removeAttribute('hidden');
+        overlay.removeAttribute('hidden');
+        orb.setAttribute('aria-expanded', 'true');
+        orb.setAttribute('aria-label', 'Close quick actions');
+        isOrbMenuOpen = true;
+        const firstItem = menu.querySelector('.radial-item');
+        if (firstItem) {
+            setRadialTabIndex(0);
+            requestAnimationFrame(() => firstItem.focus());
+        }
+    } else {
+        menu.setAttribute('hidden', '');
+        overlay.setAttribute('hidden', '');
+        orb.setAttribute('aria-expanded', 'false');
+        orb.setAttribute('aria-label', 'Open quick actions');
+        isOrbMenuOpen = false;
+        resetRadialTabIndex();
+        orb.focus();
+    }
+};
 
 window.navigateTo = function(id) {
     // Hide all sections
@@ -1117,6 +1465,10 @@ window.navigateTo = function(id) {
     document.getElementById('page-title').textContent = labels[id] || id;
 
     activeSectionId = id;
+    updateBottomNavActiveState(id);
+    if (isOrbMenuOpen) {
+        toggleOrbMenu(false);
+    }
     loadSection(id);
 };
 
