@@ -6,7 +6,7 @@ service cloud.firestore {
     }
 
     function bootstrapCode() {
-      return 'CHANGE_ME_SETUP_CODE';
+      return '';
     }
 
     function bootstrapKeys() {
@@ -38,7 +38,7 @@ service cloud.firestore {
     function isBootstrapAdminCreate(userId) {
       return isSignedIn()
         && request.auth.uid == userId
-        && bootstrapCode() != 'CHANGE_ME_SETUP_CODE'
+        && bootstrapCode() != ''
         && !exists(/databases/$(database)/documents/config/bootstrap)
         && request.resource.data.keys().hasAll(bootstrapKeys())
         && request.resource.data.keys().hasOnly(bootstrapKeys())
@@ -59,7 +59,7 @@ service cloud.firestore {
     match /config/bootstrap {
       allow read: if isAdmin();
       allow create: if isAdmin() && !exists(/databases/$(database)/documents/config/bootstrap);
-      allow update, delete: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /activities/{activityId} {

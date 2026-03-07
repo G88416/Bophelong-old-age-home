@@ -1103,7 +1103,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = 'CHANGE_ME_SETUP_CODE';
+const BOOTSTRAP_CODE = '';
 
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1115,7 +1115,7 @@ let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 
 const bootstrapBtn = document.getElementById('bootstrap-btn');
-if (bootstrapBtn && BOOTSTRAP_CODE === 'CHANGE_ME_SETUP_CODE') {
+if (bootstrapBtn && !BOOTSTRAP_CODE) {
     bootstrapBtn.disabled = true;
     bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
 }
@@ -1225,12 +1225,14 @@ window.setupAdmin = async function() {
     const confirm   = document.getElementById('b-confirm').value;
 
     if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
-    if (!setupCode) { modalMsg('bootstrap', 'Setup code is required.', 'error'); return; }
-    if (BOOTSTRAP_CODE === 'CHANGE_ME_SETUP_CODE') {
+    if (!BOOTSTRAP_CODE) {
         modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
         return;
     }
-    if (setupCode !== BOOTSTRAP_CODE) { modalMsg('bootstrap', 'Invalid setup code.', 'error'); return; }
+    if (setupCode !== BOOTSTRAP_CODE) {
+        modalMsg('bootstrap', setupCode ? 'Invalid setup code.' : 'Setup code is required.', 'error');
+        return;
+    }
     if (!password) { modalMsg('bootstrap', 'A password is required.', 'error'); return; }
     if (password.length < 8) { modalMsg('bootstrap', 'Password must be at least 8 characters.', 'error'); return; }
     if (password !== confirm) { modalMsg('bootstrap', 'Passwords do not match.', 'error'); return; }
@@ -1253,7 +1255,12 @@ window.setupAdmin = async function() {
             });
         })();
         await bootstrapCreatePromise;
-        await updateDoc(doc(db, 'users', newUid), { bootstrapCode: deleteField() });
+        try {
+            await updateDoc(doc(db, 'users', newUid), { bootstrapCode: deleteField() });
+        } catch (cleanupErr) {
+            console.warn('Bootstrap cleanup failed:', cleanupErr);
+            toast('Admin created, but bootstrap cleanup failed. Remove bootstrapCode manually.', 6000);
+        }
         bootstrapCreatePromise = null;
         bootstrapUid = null;
         closeModal('bootstrap');
