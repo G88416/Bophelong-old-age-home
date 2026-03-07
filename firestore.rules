@@ -12,8 +12,12 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn()
         && userDoc().exists()
-        && userDoc().data.active == true
-        && userDoc().data.role == 'admin';
+        && userDoc().data.get('active', false) == true
+        && userDoc().data.get('role', '') == 'admin';
+    }
+
+    function hasStaffUid(data) {
+      return data.keys().hasAll(['staffUid']);
     }
 
     match /users/{userId} {
@@ -40,9 +44,17 @@ service cloud.firestore {
     }
 
     match /leaves/{leaveId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.staffUid == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.staffUid == request.auth.uid;
-      allow update: if isAdmin() && request.resource.data.staffUid == resource.data.staffUid;
+      allow read: if isAdmin()
+        || (isSignedIn()
+          && hasStaffUid(resource.data)
+          && resource.data.staffUid == request.auth.uid);
+      allow create: if isSignedIn()
+        && hasStaffUid(request.resource.data)
+        && request.resource.data.staffUid == request.auth.uid;
+      allow update: if isAdmin()
+        && hasStaffUid(resource.data)
+        && hasStaffUid(request.resource.data)
+        && request.resource.data.staffUid == resource.data.staffUid;
       allow delete: if isAdmin();
     }
 
