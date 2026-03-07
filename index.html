@@ -556,7 +556,7 @@
             </div>
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
-            <button class="btn btn-ghost login-alt-btn" type="button" onclick="openModal('bootstrap')">First-time setup: Create admin</button>
+            <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">First-time setup: Create admin</button>
         </div>
         <p class="login-help">Need access? Contact your administrator for your login credentials.</p>
     </div>
@@ -1114,6 +1114,12 @@ let usersAll       = [];    // full user rows for client-side filtering
 let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 
+const bootstrapBtn = document.getElementById('bootstrap-btn');
+if (bootstrapBtn && BOOTSTRAP_CODE === 'CHANGE_ME_SETUP_CODE') {
+    bootstrapBtn.disabled = true;
+    bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
     const el = document.getElementById('toast');
@@ -1237,10 +1243,15 @@ window.setupAdmin = async function() {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         const newUid = cred.user.uid;
         bootstrapUid = newUid;
-        bootstrapCreatePromise = setDoc(doc(db, 'users', newUid), {
-            name, email, dept, role: 'admin', active: true, uid: newUid,
-            createdAt: serverTimestamp(), bootstrapCode: setupCode
-        });
+        bootstrapCreatePromise = (async () => {
+            await setDoc(doc(db, 'users', newUid), {
+                name, email, dept, role: 'admin', active: true, uid: newUid,
+                createdAt: serverTimestamp(), bootstrapCode: setupCode
+            });
+            await setDoc(doc(db, 'config', 'bootstrap'), {
+                usedAt: serverTimestamp(), uid: newUid
+            });
+        })();
         await bootstrapCreatePromise;
         await updateDoc(doc(db, 'users', newUid), { bootstrapCode: deleteField() });
         bootstrapCreatePromise = null;

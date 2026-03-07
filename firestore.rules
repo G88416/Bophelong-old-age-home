@@ -9,6 +9,10 @@ service cloud.firestore {
       return 'CHANGE_ME_SETUP_CODE';
     }
 
+    function bootstrapKeys() {
+      return ['name','email','dept','role','active','uid','bootstrapCode','createdAt'];
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -34,8 +38,10 @@ service cloud.firestore {
     function isBootstrapAdminCreate(userId) {
       return isSignedIn()
         && request.auth.uid == userId
-        && request.resource.data.keys().hasAll(['name','email','dept','role','active','uid','bootstrapCode','createdAt'])
-        && request.resource.data.keys().hasOnly(['name','email','dept','role','active','uid','bootstrapCode','createdAt'])
+        && bootstrapCode() != 'CHANGE_ME_SETUP_CODE'
+        && !exists(/databases/$(database)/documents/config/bootstrap)
+        && request.resource.data.keys().hasAll(bootstrapKeys())
+        && request.resource.data.keys().hasOnly(bootstrapKeys())
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.role == 'admin'
@@ -47,6 +53,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isAdmin() || isBootstrapAdminCreate(userId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /config/bootstrap {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && !exists(/databases/$(database)/documents/config/bootstrap);
       allow update, delete: if isAdmin();
     }
 

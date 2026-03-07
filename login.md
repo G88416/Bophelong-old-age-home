@@ -16,8 +16,11 @@ Before using it, **set a private bootstrap code** and deploy matching Firestore 
 2. Update `bootstrapCode()` in `firestore.rules` to the same value.
 3. Deploy the rules (`firebase deploy --only firestore:rules`).
 
-Then use the setup form to create your first admin user. After you create permanent users,
-change the bootstrap code again (or remove the setup path) and redeploy the rules.
+Then use the setup form to create your first admin user. The app stores a one-time
+lock in `config/bootstrap` so additional bootstrap admins cannot be created. After you
+create permanent users, change the bootstrap code again (or remove the setup path) and
+redeploy the rules. If you ever need to rerun setup, delete `config/bootstrap` and deploy
+with a new code.
 
 ## Need an account?
 Ask an administrator to create a user account from the **Staff & Users** section
