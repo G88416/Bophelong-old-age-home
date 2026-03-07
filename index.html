@@ -804,15 +804,12 @@
         <div class="nav-items" id="bottom-nav-items"></div>
     </div>
     <div class="orb-container">
-        <button class="orb" id="orb-toggle" type="button" aria-label="Open quick actions" aria-expanded="false" aria-controls="radial-menu" onclick="toggleOrbMenu()">+</button>
-        <div class="radial-menu" id="radial-menu" hidden>
-            <button class="radial-item" style="--angle: -15deg" type="button" aria-label="Add resident" onclick="openModal('resident'); toggleOrbMenu(false);">+ Resident</button>
-            <button class="radial-item" style="--angle: -55deg" type="button" aria-label="Add task" onclick="openModal('task'); toggleOrbMenu(false);">+ Task</button>
-            <button class="radial-item" style="--angle: -95deg" type="button" aria-label="Add medication" onclick="openModal('medication'); toggleOrbMenu(false);">+ Medication</button>
-            <button class="radial-item" style="--angle: -135deg" type="button" aria-label="Add leave request" onclick="openModal('leave'); toggleOrbMenu(false);">+ Leave</button>
-        </div>
+        <button class="orb" id="orb-toggle" type="button" aria-label="Open quick actions" aria-expanded="false" aria-controls="radial-menu">
+            <span aria-hidden="true">+</span>
+        </button>
+        <div class="radial-menu" id="radial-menu" hidden></div>
     </div>
-    <div class="menu-overlay" id="menu-overlay" hidden onclick="toggleOrbMenu(false)"></div>
+    <div class="menu-overlay" id="menu-overlay" hidden></div>
 </div><!-- /app -->
 
 <!-- ═══════════════ MODALS ═══════════════ -->
@@ -1217,6 +1214,7 @@ function showApp() {
     document.getElementById('app').style.display = 'block';
     buildSidebar();
     buildBottomNav();
+    initializeOrbMenu();
     renderUserInfo();
     updateClock();
     navigateTo('dashboard');
@@ -1234,6 +1232,15 @@ const NAV_ITEMS = [
     { id: 'finance',     icon: '💰', label: 'Finance',           roles: ['admin'] },
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
+
+const ORB_ACTIONS = [
+    { modal: 'resident',   label: '+ Resident',   ariaLabel: 'Add resident',       angle: -15 },
+    { modal: 'task',       label: '+ Task',       ariaLabel: 'Add task',           angle: -55 },
+    { modal: 'medication', label: '+ Medication', ariaLabel: 'Add medication',     angle: -95 },
+    { modal: 'leave',      label: '+ Leave',      ariaLabel: 'Add leave request',  angle: -135 },
+];
+
+let orbMenuInitialized = false;
 
 function buildSidebar() {
     const role = currentProfile.role;
@@ -1271,6 +1278,34 @@ function buildBottomNav() {
     });
 
     updateBottomNavActiveState(activeSectionId);
+}
+
+function initializeOrbMenu() {
+    if (orbMenuInitialized) return;
+    const menu = document.getElementById('radial-menu');
+    const orb = document.getElementById('orb-toggle');
+    const overlay = document.getElementById('menu-overlay');
+    if (!menu || !orb || !overlay) return;
+
+    menu.innerHTML = '';
+    ORB_ACTIONS.forEach(action => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'radial-item';
+        btn.style.setProperty('--angle', `${action.angle}deg`);
+        btn.textContent = action.label;
+        btn.setAttribute('aria-label', action.ariaLabel);
+        btn.addEventListener('click', () => {
+            openModal(action.modal);
+            toggleOrbMenu(false);
+        });
+        menu.appendChild(btn);
+    });
+
+    orb.addEventListener('click', () => toggleOrbMenu());
+    overlay.addEventListener('click', () => toggleOrbMenu(false));
+    setupRadialMenuNavigation();
+    orbMenuInitialized = true;
 }
 
 function renderUserInfo() {
@@ -1314,8 +1349,6 @@ function setupRadialMenuNavigation() {
         });
     });
 }
-
-setupRadialMenuNavigation();
 
 window.toggleOrbMenu = function(forceState) {
     const menu = document.getElementById('radial-menu');
@@ -1362,7 +1395,10 @@ window.navigateTo = function(id) {
 
     activeSectionId = id;
     updateBottomNavActiveState(id);
-    toggleOrbMenu(false);
+    const orb = document.getElementById('orb-toggle');
+    if (orb && orb.getAttribute('aria-expanded') === 'true') {
+        toggleOrbMenu(false);
+    }
     loadSection(id);
 };
 
