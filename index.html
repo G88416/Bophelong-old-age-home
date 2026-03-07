@@ -25,6 +25,10 @@
             --bottom-nav-height: 72px;
             --orb-gap: 24px;
             --orb-gap-compact: 16px;
+            --z-bottom-nav: 900;
+            --z-menu-overlay: 940;
+            --z-orb: 950;
+            --z-modal: 960;
         }
 
         /* ── Base ──────────────────────────────────────────────── */
@@ -239,7 +243,7 @@
         .modal-overlay {
             position: fixed; inset: 0; background: rgba(0,0,0,.5);
             display: flex; align-items: center; justify-content: center;
-            z-index: 960; padding: 20px;
+            z-index: var(--z-modal); padding: 20px;
         }
         .modal-overlay[hidden] { display: none !important; }
         .modal {
@@ -382,7 +386,7 @@
             background: rgba(15, 23, 42, 0.45);
             backdrop-filter: blur(16px);
             border-top: 1px solid rgba(255,255,255,0.08);
-            z-index: 900;
+            z-index: var(--z-bottom-nav);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -427,7 +431,7 @@
             position: fixed;
             bottom: calc(var(--bottom-nav-height) + var(--orb-gap));
             right: 24px;
-            z-index: 950;
+            z-index: var(--z-orb);
         }
 
         .orb {
@@ -502,7 +506,7 @@
             inset: 0;
             background: rgba(0,0,0,0.4);
             backdrop-filter: blur(4px);
-            z-index: 940;
+            z-index: var(--z-menu-overlay);
         }
 
         .menu-overlay[hidden] { display: none; }
@@ -1210,9 +1214,7 @@ function showLogin() {
     const btn = document.getElementById('login-btn');
     btn.disabled = false;
     btn.textContent = 'Sign In';
-    orbMenuInitialized = false;
-    radialMenuItems = [];
-    activeRadialIndex = 0;
+    resetOrbMenuState();
 }
 
 function showApp() {
@@ -1249,6 +1251,12 @@ const ORB_ACTIONS = [
 let orbMenuInitialized = false;
 let radialMenuItems = [];
 let activeRadialIndex = 0;
+
+function resetOrbMenuState() {
+    orbMenuInitialized = false;
+    radialMenuItems = [];
+    activeRadialIndex = 0;
+}
 
 function buildSidebar() {
     const role = currentProfile.role;
@@ -1334,6 +1342,7 @@ function renderUserInfo() {
 
 // ── Navigation ────────────────────────────────────────────────────────
 let activeSectionId = 'dashboard';
+const RADIAL_MENU_NAV_KEYS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'];
 
 function updateBottomNavActiveState(id) {
     document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1363,7 +1372,7 @@ function setupRadialMenuNavigation() {
                 toggleOrbMenu(false);
                 return;
             }
-            if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+            if (!RADIAL_MENU_NAV_KEYS.includes(event.key)) {
                 return;
             }
             event.preventDefault();
