@@ -5,6 +5,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function bootstrapCode() {
+      // Must match BOOTSTRAP_CODE in index.html for temporary setup.
+      // Do not deploy with the default value.
+      return 'CHANGE_ME_BEFORE_DEPLOYMENT';
+    }
+
+    function bootstrapKeys() {
+      return ['name','email','dept','role','active','uid','bootstrapCode','createdAt'];
+    }
+
+    function isBootstrapLocked() {
+      return exists(/databases/$(database)/documents/config/bootstrap);
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -27,9 +41,31 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid;
     }
 
+    function isBootstrapAdminCreate(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && bootstrapCode() != 'CHANGE_ME_BEFORE_DEPLOYMENT'
+        && !isBootstrapLocked()
+        && request.resource.data.keys().hasAll(bootstrapKeys())
+        && request.resource.data.keys().hasOnly(bootstrapKeys())
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.role == 'admin'
+        && request.resource.data.active == true
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.bootstrapCode == bootstrapCode();
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() || isBootstrapAdminCreate(userId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /config/bootstrap {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && !isBootstrapLocked();
+      allow update, delete: if false;
     }
 
     match /activities/{activityId} {
