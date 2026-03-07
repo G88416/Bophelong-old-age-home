@@ -12,12 +12,18 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn()
         && userDoc().exists()
-        && userDoc().data.get('active', false) == true
+        && userDoc().data.get('active', false)
         && userDoc().data.get('role', '') == 'admin';
     }
 
     function hasStaffUid(data) {
       return data.keys().hasAll(['staffUid']);
+    }
+
+    function isActivityPayload() {
+      return request.resource.data.keys().hasAll(['msg', 'date', 'uid'])
+        && request.resource.data.msg is string
+        && request.resource.data.uid == request.auth.uid;
     }
 
     match /users/{userId} {
@@ -27,7 +33,7 @@ service cloud.firestore {
 
     match /activities/{activityId} {
       allow read: if isAdmin();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn() && isActivityPayload();
       allow update, delete: if isAdmin();
     }
 
