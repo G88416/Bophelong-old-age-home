@@ -1222,6 +1222,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadProfile(user) {
+    const rawAuthEmail = String((user && user.email) || '').trim();
     const normalizedAuthEmail = requireAuthEmail(user);
     // Try UID-keyed doc first
     let snap = await getDoc(doc(db, 'users', user.uid));
@@ -1231,10 +1232,14 @@ async function loadProfile(user) {
         const normalizedEmail = normalizedAuthEmail;
         // Some legacy profiles stored the Firebase UID in a field but used a different document ID.
         let qs = await getDocs(query(usersRef, where('uid', '==', user.uid)));
-        if (qs.empty && normalizedEmail) {
+        if (qs.empty) {
+            qs = rawAuthEmail ? await getDocs(query(usersRef, where('email', '==', rawAuthEmail))) : { empty: true };
+        }
+        if (qs.empty && rawAuthEmail !== normalizedEmail) {
             qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
         }
         if (qs.empty) {
+            // Final fallback keeps older mixed-case email records sign-in compatible.
             qs = await getDocs(usersRef);
             const legacyMatch = qs.docs.find(d => {
                 const data = d.data();
