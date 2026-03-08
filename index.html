@@ -1222,14 +1222,29 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadProfile(user) {
+    const rawAuthEmail = String((user && user.email) || '').trim();
+    const normalizedAuthEmail = requireAuthEmail(user);
     // Try UID-keyed doc first
     let snap = await getDoc(doc(db, 'users', user.uid));
     if (!snap.exists()) {
         // Fallback: find by email (legacy data)
-        const q = query(collection(db, 'users'), where('email', '==', user.email));
-        const qs = await getDocs(q);
-        if (qs.empty) throw new Error('no-profile');
-        snap = qs.docs[0];
+        const usersRef = collection(db, 'users');
+        const normalizedEmail = normalizedAuthEmail;
+        let qs = rawAuthEmail ? await getDocs(query(usersRef, where('email', '==', rawAuthEmail))) : { empty: true };
+        if (qs.empty && rawAuthEmail !== normalizedEmail) {
+            qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
+        }
+        if (qs.empty) {
+            qs = await getDocs(usersRef);
+            const legacyMatch = qs.docs.find(d => {
+                const data = d.data();
+                return !!data.email && normalizeEmail(data.email) === normalizedEmail;
+            });
+            if (!legacyMatch) throw new Error('no-profile');
+            snap = legacyMatch;
+        } else {
+            snap = qs.docs[0];
+        }
     }
     const data = snap.data();
     if (!isUserActive(data)) throw new Error('inactive');
