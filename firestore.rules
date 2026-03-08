@@ -44,7 +44,6 @@ service cloud.firestore {
     function isBootstrapAdminCreate(userId) {
       return isSignedIn()
         && request.auth.uid == userId
-        && bootstrapCode() != 'CHANGE_ME_BEFORE_DEPLOYMENT'
         && !isBootstrapLocked()
         && request.resource.data.keys().hasAll(bootstrapKeys())
         && request.resource.data.keys().hasOnly(bootstrapKeys())

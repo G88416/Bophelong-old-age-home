@@ -94,6 +94,16 @@
             display: block; text-align: center; margin-top: 16px;
             color: #94a3b8; font-size: .82rem; text-decoration: none;
         }
+        .checkbox-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: .82rem;
+            color: var(--muted);
+        }
+        .checkbox-row input {
+            margin-top: 2px;
+        }
         .login-alt-btn {
             width: 100%;
             justify-content: center;
@@ -556,7 +566,8 @@
             </div>
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
-            <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">First-time setup: Create admin</button>
+            <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">Create demo admin account</button>
+            <p class="login-help" id="bootstrap-default-note" hidden>The temporary default setup code is enabled for this build. Rotate it after you create your permanent admin.</p>
         </div>
         <p class="login-help">Need access? Contact your administrator for your login credentials.</p>
     </div>
@@ -893,10 +904,10 @@
 <!-- Bootstrap admin modal -->
 <div class="modal-overlay" id="modal-bootstrap" hidden>
     <div class="modal">
-        <h3>🧭 Temporary Admin Setup</h3>
+        <h3>🧭 Demo Admin Setup</h3>
         <div class="alert alert-warn">
-            Use this only for first-time setup. After creating your permanent admin,
-            change the bootstrap code and redeploy your Firestore rules.
+            Use this only for first-time setup. Enter the temporary setup code for this build,
+            create a temporary admin, then add your permanent admin account and rotate the code.
         </div>
         <div class="form-group"><label>Full Name *</label><input id="b-name" placeholder="Full name"></div>
         <div class="form-group"><label>Email Address *</label><input id="b-email" type="email" placeholder="admin@example.com"></div>
@@ -921,6 +932,12 @@
                 <input id="b-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
                 <button type="button" class="pw-toggle" onclick="togglePw('b-confirm',this)" title="Show/hide password" aria-label="Show password">👁</button>
             </div>
+        </div>
+        <div class="form-group" id="b-default-ack-wrap" hidden>
+            <label class="checkbox-row">
+                <input id="b-default-ack" type="checkbox">
+                <span>I understand this build still uses the temporary default setup code, and I will rotate it immediately after creating a permanent admin.</span>
+            </label>
         </div>
         <div class="modal-msg" id="modal-bootstrap-msg"></div>
         <div class="modal-footer">
@@ -1103,7 +1120,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Rotate after first use; never deploy with the default value.
+const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Temporary setup code for this build. Rotate after the permanent admin is created.
 const BOOTSTRAP_CLEANUP_MAX_ATTEMPTS = 2;
 const BOOTSTRAP_CLEANUP_DELAY_MS = 200;
 
@@ -1117,17 +1134,26 @@ let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 const bootstrapCleanupAttempted = new Set();
 
-function isBootstrapConfigured() {
-    return BOOTSTRAP_CODE && BOOTSTRAP_CODE !== 'CHANGE_ME_BEFORE_DEPLOYMENT';
+function hasBootstrapCode() {
+    return BOOTSTRAP_CODE.trim().length > 0;
+}
+
+function isDefaultBootstrapCode() {
+    return BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT';
 }
 
 const bootstrapBtn = document.getElementById('bootstrap-btn');
-if (bootstrapBtn && !isBootstrapConfigured()) {
+if (bootstrapBtn && !hasBootstrapCode()) {
     bootstrapBtn.disabled = true;
     bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
     const msgEl = document.getElementById('login-msg');
     msgEl.textContent = 'Bootstrap setup is disabled until BOOTSTRAP_CODE is set.';
     msgEl.className = 'login-msg info';
+} else if (isDefaultBootstrapCode()) {
+    const defaultNote = document.getElementById('bootstrap-default-note');
+    if (defaultNote) defaultNote.hidden = false;
+    const defaultAckWrap = document.getElementById('b-default-ack-wrap');
+    if (defaultAckWrap) defaultAckWrap.hidden = false;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -1255,12 +1281,17 @@ window.setupAdmin = async function() {
     const confirm   = document.getElementById('b-confirm').value;
 
     if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
-    if (!isBootstrapConfigured()) {
+    if (!hasBootstrapCode()) {
         modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
         return;
     }
     if (setupCode !== BOOTSTRAP_CODE) {
         modalMsg('bootstrap', setupCode ? 'Invalid setup code.' : 'Setup code is required.', 'error');
+        return;
+    }
+    const ackCheckbox = document.getElementById('b-default-ack');
+    if (isDefaultBootstrapCode() && (!ackCheckbox || !ackCheckbox.checked)) {
+        modalMsg('bootstrap', 'Confirm that you will rotate the default setup code after creating your permanent admin.', 'error');
         return;
     }
     if (!password) { modalMsg('bootstrap', 'A password is required.', 'error'); return; }
@@ -2181,6 +2212,8 @@ window.openModal  = function(name) {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
+        const bootstrapAck = document.getElementById('b-default-ack');
+        if (bootstrapAck) bootstrapAck.checked = false;
         ['b-code','b-password','b-confirm'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.type = 'password';
