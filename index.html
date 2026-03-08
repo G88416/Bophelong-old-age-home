@@ -556,7 +556,8 @@
             </div>
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
-            <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">First-time setup: Create admin</button>
+            <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">Create demo admin account</button>
+            <p class="login-help">No admin yet? Use the demo setup once, then create your permanent admin account from <strong>Staff &amp; Users</strong>.</p>
         </div>
         <p class="login-help">Need access? Contact your administrator for your login credentials.</p>
     </div>
@@ -893,10 +894,10 @@
 <!-- Bootstrap admin modal -->
 <div class="modal-overlay" id="modal-bootstrap" hidden>
     <div class="modal">
-        <h3>🧭 Temporary Admin Setup</h3>
+        <h3>🧭 Demo Admin Setup</h3>
         <div class="alert alert-warn">
-            Use this only for first-time setup. After creating your permanent admin,
-            change the bootstrap code and redeploy your Firestore rules.
+            Use this only for first-time setup. Enter demo setup code <strong><code>BophelongDemoAdmin2026</code></strong>,
+            create a temporary admin, then add your permanent admin account and rotate this code.
         </div>
         <div class="form-group"><label>Full Name *</label><input id="b-name" placeholder="Full name"></div>
         <div class="form-group"><label>Email Address *</label><input id="b-email" type="email" placeholder="admin@example.com"></div>
@@ -1103,7 +1104,7 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Rotate after first use; never deploy with the default value.
+const BOOTSTRAP_CODE = 'BophelongDemoAdmin2026'; // Demo-only setup code. Rotate after the permanent admin is created.
 const BOOTSTRAP_CLEANUP_MAX_ATTEMPTS = 2;
 const BOOTSTRAP_CLEANUP_DELAY_MS = 200;
 

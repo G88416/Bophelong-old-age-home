@@ -8,7 +8,7 @@ service cloud.firestore {
     function bootstrapCode() {
       // Must match BOOTSTRAP_CODE in index.html for temporary setup.
       // Do not deploy with the default value.
-      return 'CHANGE_ME_BEFORE_DEPLOYMENT';
+      return 'BophelongDemoAdmin2026';
     }
 
     function bootstrapKeys() {
