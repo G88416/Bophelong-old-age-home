@@ -1295,7 +1295,11 @@ async function writePermanentAdminProfile(user, { name, dept, bootstrapCode } = 
 async function completePermanentAdminSetup(user, profile) {
     bootstrapUid = user.uid;
     bootstrapCreatePromise = (async () => {
-        await createBootstrapReservation(user.uid);
+        try {
+            await createBootstrapReservation(user.uid);
+        } catch (e) {
+            if (e.code !== 'permission-denied') throw e;
+        }
         await writePermanentAdminProfile(user, profile);
         await finalizeBootstrapReservation();
     })();
@@ -1597,10 +1601,10 @@ async function needsFirstRunSetup(forceRefresh = false) {
     if (!forceRefresh && firstRunSetupRequired !== null) return firstRunSetupRequired;
     try {
         const snap = await getDoc(doc(db, 'config', 'bootstrap'));
-        firstRunSetupRequired = !snap.exists();
+        firstRunSetupRequired = !snap.exists() || snap.data().initialized !== true;
     } catch (e) {
         console.warn('Unable to determine first-run setup state:', e);
-        firstRunSetupRequired = false;
+        firstRunSetupRequired = e && e.code === 'permission-denied';
     }
     return firstRunSetupRequired;
 }
