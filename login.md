@@ -5,6 +5,7 @@ This portal uses Firebase email/password authentication.
 ## Default admin credentials
 - **Email:** `admin@admin.local`
 - **Password:** `admin@123`
+- **Important:** Change this password immediately after the first successful sign-in. This app does not include an in-app password change screen, so rotate it in Firebase Authentication.
 
 ## How to sign in
 1. Open `index.html` in a browser (or the deployed site).

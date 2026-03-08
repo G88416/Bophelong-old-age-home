@@ -572,7 +572,7 @@
         <div class="login-card" id="first-run-card" style="display:none">
             <h2>👑 Create Your Permanent Admin Account</h2>
             <p style="color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
-                This is the first-time setup for the portal. The app will provision the default admin account with email <strong>admin@admin.local</strong> and password <strong>admin@123</strong>.
+                This is the first-time setup for the portal. The app will provision the default admin account automatically, and this form stays available as the fallback setup path.
             </p>
             <div class="form-group">
                 <label for="fr-name">Full Name</label>
@@ -598,7 +598,7 @@
             <div class="login-msg" id="first-run-msg"></div>
             <button class="btn btn-ghost login-alt-btn" type="button" onclick="showLoginScreen()">I already have an account</button>
         </div>
-        <p class="login-help" id="login-help">Default admin login: <strong>admin@admin.local</strong> / <strong>admin@123</strong></p>
+        <p class="login-help" id="login-help">Default admin login: <strong>admin@admin.local</strong> / <strong>admin@123</strong>. Change this password after the first sign-in.</p>
     </div>
 </div>
 
@@ -1170,7 +1170,6 @@ let bootstrapUid = null;
 const bootstrapCleanupAttempted = new Set();
 let firstRunSetupRequired = null;
 let defaultAdminProvisionPromise = null;
-let defaultAdminAutoProvisionFailed = false;
 
 function hasBootstrapCode() {
     return BOOTSTRAP_CODE.trim().length > 0;
@@ -1310,9 +1309,7 @@ function prefillDefaultAdminForm() {
     const defaults = {
         'fr-name': DEFAULT_ADMIN.name,
         'fr-email': DEFAULT_ADMIN.email,
-        'fr-dept': DEFAULT_ADMIN.dept,
-        'fr-password': DEFAULT_ADMIN.password,
-        'fr-confirm': DEFAULT_ADMIN.password
+        'fr-dept': DEFAULT_ADMIN.dept
     };
     Object.entries(defaults).forEach(([id, value]) => {
         const input = document.getElementById(id);
@@ -1321,11 +1318,11 @@ function prefillDefaultAdminForm() {
 }
 
 async function ensureDefaultAdminAccount() {
-    if (defaultAdminAutoProvisionFailed) return false;
     if (defaultAdminProvisionPromise) return defaultAdminProvisionPromise;
 
     defaultAdminProvisionPromise = (async () => {
-        if (!(await needsFirstRunSetup(true))) return false;
+        const setupRequired = await needsFirstRunSetup(true);
+        if (!setupRequired) return false;
 
         let createdUser = null;
         let signedInExistingUser = false;
@@ -1348,7 +1345,12 @@ async function ensureDefaultAdminAccount() {
             } else {
                 const profile = profileSnap.data();
                 if (profile.role !== 'admin' || !isUserActive(profile)) {
-                    throw new Error('Default admin account exists without an active admin profile.');
+                    const issue = profile.role !== 'admin'
+                        ? 'does not have admin access'
+                        : 'is inactive';
+                    const error = new Error(`The default admin account exists but ${issue}. Please contact your system administrator.`);
+                    error.code = 'default-admin-profile-invalid';
+                    throw error;
                 }
                 await createBootstrapReservation(user.uid);
                 await finalizeBootstrapReservation();
@@ -1357,10 +1359,12 @@ async function ensureDefaultAdminAccount() {
             return true;
         } catch (err) {
             console.warn('Default admin provisioning failed:', err);
-            defaultAdminAutoProvisionFailed = true;
             const msgEl = document.getElementById('first-run-msg');
             if (msgEl) {
-                msgEl.textContent = 'Unable to provision the default admin automatically. Use admin@admin.local / admin@123 on this screen and try again.';
+                const detail = err && err.code === 'default-admin-profile-invalid'
+                    ? ` ${err.message}`
+                    : ' Please use the default credentials manually or contact your system administrator.';
+                msgEl.textContent = `Unable to provision the default admin automatically.${detail}`;
                 msgEl.className = 'login-msg error';
             }
             if (createdUser) {
@@ -1674,6 +1678,7 @@ function showFirstRunSetup() {
 
 async function showEntryScreen(forceRefresh = false) {
     if (await needsFirstRunSetup(forceRefresh)) {
+        // Auto-provision signs the default admin in, so the auth state watcher will continue into the app.
         if (await ensureDefaultAdminAccount()) return;
         showFirstRunSetup();
         return;
