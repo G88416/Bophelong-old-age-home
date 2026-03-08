@@ -5,33 +5,9 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function bootstrapCode() {
-      // Must match BOOTSTRAP_CODE in index.html for temporary setup.
-      // Do not deploy with the default value.
-      return 'CHANGE_ME_BEFORE_DEPLOYMENT';
-    }
-
-    function bootstrapKeys() {
-      return ['name','email','dept','role','active','uid','bootstrapCode','createdAt'];
-    }
-
-    function isBootstrapAdminData(data) {
-      return data.get('role', '') == 'admin'
-        && data.get('active', false)
-        && data.get('bootstrapCode', '') == bootstrapCode();
-    }
-
     function isPermanentAdminData(data) {
       return data.get('role', '') == 'admin'
         && data.get('active', false);
-    }
-
-    function isBootstrapLocked() {
-      return exists(/databases/$(database)/documents/config/bootstrap);
-    }
-
-    function bootstrapLockDoc() {
-      return get(/databases/$(database)/documents/config/bootstrap);
     }
 
     function userDoc() {
@@ -56,83 +32,10 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid;
     }
 
-    function isBootstrapAdminCreate(userId) {
-      return isSignedIn()
-        && request.auth.uid == userId
-        && !isBootstrapLocked()
-        && request.resource.data.keys().hasAll(bootstrapKeys())
-        && request.resource.data.keys().hasOnly(bootstrapKeys())
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.createdAt is timestamp
-        && isBootstrapAdminData(request.resource.data);
-    }
-
-    function isInitialAdminCreate(userId) {
-      return isSignedIn()
-        && request.auth.uid == userId
-        && isBootstrapReservationOwner()
-        && request.resource.data.keys().hasAll(['name','email','dept','role','active','uid','createdAt'])
-        && request.resource.data.keys().hasOnly(['name','email','dept','role','active','uid','createdAt'])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.createdAt is timestamp
-        && isPermanentAdminData(request.resource.data);
-    }
-
-    function isBootstrapReservationDoc(data) {
-      return data.keys().hasAll(['uid', 'initialized', 'reservedAt'])
-        && data.keys().hasOnly(['uid', 'initialized', 'reservedAt'])
-        && data.get('uid', '') == request.auth.uid
-        && data.get('initialized', true) == false
-        && data.get('reservedAt', null) is timestamp;
-    }
-
-    function isBootstrapReservationOwner() {
-      let lockDoc = bootstrapLockDoc();
-      return isSignedIn()
-        && lockDoc.exists()
-        && lockDoc.data.get('uid', '') == request.auth.uid
-        && lockDoc.data.get('initialized', true) == false;
-    }
-
-    function isPublicBootstrapState(data) {
-      return data.keys().hasAll(['initialized', 'usedAt'])
-        && data.keys().hasOnly(['initialized', 'usedAt'])
-        && data.get('initialized', false) == true
-        && data.get('usedAt', null) is timestamp;
-    }
-
-    function isBootstrapFinalizeDoc(data) {
-      return isPublicBootstrapState(data);
-    }
-
-    function isBootstrapLockCreate() {
-      return isSignedIn()
-        && !isBootstrapLocked()
-        && isBootstrapReservationDoc(request.resource.data);
-    }
-
-    function isBootstrapLockFinalize() {
-      let adminUserDoc = userDoc();
-      return isBootstrapReservationOwner()
-        && isBootstrapFinalizeDoc(request.resource.data)
-        && adminUserDoc.exists()
-        && isPermanentAdminData(adminUserDoc.data);
-    }
-
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin() || isBootstrapAdminCreate(userId) || isInitialAdminCreate(userId);
+      allow create: if isAdmin();
       allow update, delete: if isAdmin();
-    }
-
-    match /config/bootstrap {
-      allow get: if resource == null || isAdmin() || isPublicBootstrapState(resource.data);
-      allow list: if false;
-      allow create: if isBootstrapLockCreate();
-      allow update: if isBootstrapLockFinalize();
-      allow delete: if isBootstrapReservationOwner();
     }
 
     match /activities/{activityId} {

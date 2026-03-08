@@ -566,39 +566,8 @@
             </div>
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
-            <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">Create demo admin account</button>
-            <p class="login-help" id="bootstrap-default-note" hidden>The temporary default setup code is enabled for this build. Rotate it after you create your permanent admin.</p>
         </div>
-        <div class="login-card" id="first-run-card" style="display:none">
-            <h2>👑 Create Your Permanent Admin Account</h2>
-            <p style="color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
-                This is the first-time setup for the portal. The app will provision the default admin account automatically, and this form stays available as the fallback setup path.
-            </p>
-            <div class="form-group">
-                <label for="fr-name">Full Name</label>
-                <input type="text" id="fr-name" placeholder="Admin name" autocomplete="name">
-            </div>
-            <div class="form-group">
-                <label for="fr-email">Email Address</label>
-                <input type="email" id="fr-email" placeholder="admin@example.com" autocomplete="email">
-            </div>
-            <div class="form-group">
-                <label for="fr-dept">Department</label>
-                <input type="text" id="fr-dept" placeholder="Administration" autocomplete="organization">
-            </div>
-            <div class="form-group">
-                <label for="fr-password">Password</label>
-                <input type="password" id="fr-password" placeholder="Minimum 8 characters" autocomplete="new-password">
-            </div>
-            <div class="form-group">
-                <label for="fr-confirm">Confirm Password</label>
-                <input type="password" id="fr-confirm" placeholder="Repeat password" autocomplete="new-password">
-            </div>
-            <button class="login-btn" id="first-run-btn" onclick="createInitialAdmin()">Create Permanent Admin</button>
-            <div class="login-msg" id="first-run-msg"></div>
-            <button class="btn btn-ghost login-alt-btn" type="button" onclick="showLoginScreen()">I already have an account</button>
-        </div>
-        <p class="login-help" id="login-help">Default admin login: <strong>admin@admin.local</strong> / <strong>admin@123</strong>. Change this password after the first sign-in.</p>
+        <p class="login-help" id="login-help">Sign in with the email address and password provided by your administrator.</p>
     </div>
 </div>
 
@@ -930,52 +899,6 @@
     </div>
 </div>
 
-<!-- Bootstrap admin modal -->
-<div class="modal-overlay" id="modal-bootstrap" hidden>
-    <div class="modal">
-        <h3>🧭 Demo Admin Setup</h3>
-        <div class="alert alert-warn">
-            Use this only for first-time setup. Enter the temporary setup code for this build,
-            create a temporary admin, then add your permanent admin account and rotate the code.
-        </div>
-        <div class="form-group"><label>Full Name *</label><input id="b-name" placeholder="Full name"></div>
-        <div class="form-group"><label>Email Address *</label><input id="b-email" type="email" placeholder="admin@example.com"></div>
-        <div class="form-group"><label>Department</label><input id="b-dept" placeholder="e.g. Administration"></div>
-        <div class="form-group">
-            <label>Setup Code *</label>
-            <div class="pw-wrap">
-                <input id="b-code" type="password" placeholder="Enter setup code" autocomplete="off">
-                <button type="button" class="pw-toggle" onclick="togglePw('b-code',this)" title="Show/hide code" aria-label="Show setup code">👁</button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Password *</label>
-            <div class="pw-wrap">
-                <input id="b-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password">
-                <button type="button" class="pw-toggle" onclick="togglePw('b-password',this)" title="Show/hide password" aria-label="Show password">👁</button>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Confirm Password *</label>
-            <div class="pw-wrap">
-                <input id="b-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
-                <button type="button" class="pw-toggle" onclick="togglePw('b-confirm',this)" title="Show/hide password" aria-label="Show password">👁</button>
-            </div>
-        </div>
-        <div class="form-group" id="b-default-ack-wrap" hidden>
-            <label class="checkbox-row">
-                <input id="b-default-ack" type="checkbox">
-                <span>I understand this build still uses the temporary default setup code, and I will rotate it immediately after creating a permanent admin.</span>
-            </label>
-        </div>
-        <div class="modal-msg" id="modal-bootstrap-msg"></div>
-        <div class="modal-footer">
-            <button class="btn btn-ghost" onclick="closeModal('bootstrap')">Cancel</button>
-            <button class="btn btn-primary" id="setup-admin-btn" onclick="setupAdmin()">Create Admin</button>
-        </div>
-    </div>
-</div>
-
 <!-- Task modal -->
 <div class="modal-overlay" id="modal-task" hidden>
     <div class="modal">
@@ -1128,11 +1051,11 @@ import { initializeApp, getApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, deleteUser }
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
     getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc,
-    query, orderBy, limit, serverTimestamp, where, getDoc, deleteField
+    query, orderBy, limit, serverTimestamp, where, getDoc
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1149,42 +1072,12 @@ const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
-const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Temporary setup code for this build. Rotate after the permanent admin is created.
-const DEFAULT_ADMIN = Object.freeze({
-    name: 'Admin',
-    email: 'admin@admin.local',
-    dept: 'Administration',
-    password: 'admin@123'
-});
-const BOOTSTRAP_CLEANUP_MAX_ATTEMPTS = 2;
-const BOOTSTRAP_CLEANUP_DELAY_MS = 200;
-
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
 let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
-let bootstrapCreatePromise = null;
-let bootstrapUid = null;
-const bootstrapCleanupAttempted = new Set();
-let firstRunSetupRequired = null;
-let defaultAdminProvisionPromise = null;
-
-function hasBootstrapCode() {
-    return BOOTSTRAP_CODE.trim().length > 0;
-}
-
-function isDefaultBootstrapCode() {
-    return BOOTSTRAP_CODE === 'CHANGE_ME_BEFORE_DEPLOYMENT';
-}
-
-const bootstrapBtn = document.getElementById('bootstrap-btn');
-if (bootstrapBtn) bootstrapBtn.hidden = true;
-const defaultNote = document.getElementById('bootstrap-default-note');
-if (defaultNote) defaultNote.hidden = true;
-const defaultAckWrap = document.getElementById('b-default-ack-wrap');
-if (defaultAckWrap) defaultAckWrap.hidden = true;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1201,26 +1094,6 @@ async function logActivity(msg) {
             msg, date: serverTimestamp(), uid: currentUser.uid
         });
     } catch (e) { console.error('logActivity failed:', e); }
-}
-
-async function cleanupBootstrapCode(docRef, notify = false) {
-    let lastErr;
-    for (let attempt = 1; attempt <= BOOTSTRAP_CLEANUP_MAX_ATTEMPTS; attempt++) {
-        try {
-            await updateDoc(docRef, { bootstrapCode: deleteField() });
-            return true;
-        } catch (cleanupErr) {
-            lastErr = cleanupErr;
-            if (attempt < BOOTSTRAP_CLEANUP_MAX_ATTEMPTS) {
-                await new Promise(resolve => setTimeout(resolve, BOOTSTRAP_CLEANUP_DELAY_MS * attempt));
-            }
-        }
-    }
-    console.warn('Bootstrap cleanup failed:', lastErr);
-    if (notify) {
-        toast('Admin created, but bootstrap cleanup failed. Remove bootstrapCode manually.', 6000);
-    }
-    return false;
 }
 
 window.togglePw = function(id, btn) {
@@ -1263,132 +1136,6 @@ function requireAuthEmail(user) {
     const email = normalizeEmail(user && user.email);
     if (!email) throw new Error('User authentication succeeded but no email was returned by Firebase Auth.');
     return email;
-}
-
-async function createBootstrapReservation(uid) {
-    await setDoc(doc(db, 'config', 'bootstrap'), {
-        uid, initialized: false, reservedAt: serverTimestamp()
-    });
-}
-
-async function finalizeBootstrapReservation() {
-    await setDoc(doc(db, 'config', 'bootstrap'), {
-        initialized: true, usedAt: serverTimestamp()
-    });
-}
-
-async function writePermanentAdminProfile(user, { name, dept, bootstrapCode } = {}) {
-    const uid = user.uid;
-    const data = {
-        name,
-        email: requireAuthEmail(user),
-        dept,
-        role: 'admin',
-        active: true,
-        uid,
-        createdAt: serverTimestamp()
-    };
-    if (bootstrapCode) data.bootstrapCode = bootstrapCode;
-    await setDoc(doc(db, 'users', uid), data);
-}
-
-async function completePermanentAdminSetup(user, profile) {
-    bootstrapUid = user.uid;
-    bootstrapCreatePromise = (async () => {
-        try {
-            await createBootstrapReservation(user.uid);
-        } catch (e) {
-            if (e.code !== 'permission-denied') throw e;
-        }
-        await writePermanentAdminProfile(user, profile);
-        await finalizeBootstrapReservation();
-    })();
-    await bootstrapCreatePromise;
-    bootstrapCreatePromise = null;
-    bootstrapUid = null;
-    firstRunSetupRequired = false;
-}
-
-function prefillDefaultAdminForm() {
-    const defaults = {
-        'fr-name': DEFAULT_ADMIN.name,
-        'fr-email': DEFAULT_ADMIN.email,
-        'fr-dept': DEFAULT_ADMIN.dept
-    };
-    Object.entries(defaults).forEach(([id, value]) => {
-        const input = document.getElementById(id);
-        if (input && !input.value) input.value = value;
-    });
-}
-
-async function ensureDefaultAdminAccount() {
-    if (defaultAdminProvisionPromise) return defaultAdminProvisionPromise;
-
-    defaultAdminProvisionPromise = (async () => {
-        const setupRequired = await needsFirstRunSetup(true);
-        if (!setupRequired) return false;
-
-        let createdUser = null;
-        let signedInExistingUser = false;
-        try {
-            let user;
-            try {
-                const cred = await createUserWithEmailAndPassword(auth, DEFAULT_ADMIN.email, DEFAULT_ADMIN.password);
-                user = cred.user;
-                createdUser = user;
-            } catch (err) {
-                if (err.code !== 'auth/email-already-in-use') throw err;
-                signedInExistingUser = true;
-                const cred = await signInWithEmailAndPassword(auth, DEFAULT_ADMIN.email, DEFAULT_ADMIN.password);
-                user = cred.user;
-            }
-
-            const profileSnap = await getDoc(doc(db, 'users', user.uid));
-            if (!profileSnap.exists()) {
-                await completePermanentAdminSetup(user, DEFAULT_ADMIN);
-            } else {
-                const profile = profileSnap.data();
-                if (profile.role !== 'admin' || !isUserActive(profile)) {
-                    const issue = profile.role !== 'admin'
-                        ? 'does not have admin access'
-                        : 'is inactive';
-                    const error = new Error(`The default admin account exists but ${issue}. Please contact your system administrator.`);
-                    error.code = 'default-admin-profile-invalid';
-                    throw error;
-                }
-                await createBootstrapReservation(user.uid);
-                await finalizeBootstrapReservation();
-                firstRunSetupRequired = false;
-            }
-            return true;
-        } catch (err) {
-            console.warn('Default admin provisioning failed:', err);
-            const msgEl = document.getElementById('first-run-msg');
-            if (msgEl) {
-                const detail = err && err.code === 'default-admin-profile-invalid'
-                    ? ` ${err.message}`
-                    : ' Please use the default credentials manually or contact your system administrator.';
-                msgEl.textContent = `Unable to provision the default admin automatically.${detail}`;
-                msgEl.className = 'login-msg error';
-            }
-            if (createdUser) {
-                try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
-                    console.warn('Default admin bootstrap cleanup failed:', cleanupErr);
-                }
-                try { await deleteUser(createdUser); } catch (cleanupErr) {
-                    console.warn('Default admin auth cleanup failed:', cleanupErr);
-                }
-            }
-            if (signedInExistingUser) {
-                try { await signOut(auth); } catch (signOutErr) { console.warn('Sign out failed:', signOutErr); }
-            }
-            return false;
-        } finally {
-            defaultAdminProvisionPromise = null;
-        }
-    })();
-
-    return defaultAdminProvisionPromise;
 }
 
 function statusBadge(s) {
@@ -1442,153 +1189,10 @@ window.doLogin = async function() {
     }
 };
 
-window.createInitialAdmin = async function() {
-    const name     = document.getElementById('fr-name').value.trim();
-    const email    = normalizeEmail(document.getElementById('fr-email').value);
-    const dept     = document.getElementById('fr-dept').value.trim() || 'Administration';
-    const password = document.getElementById('fr-password').value;
-    const confirm  = document.getElementById('fr-confirm').value;
-    const btn      = document.getElementById('first-run-btn');
-    const msgEl    = document.getElementById('first-run-msg');
-
-    if (!name || !email) {
-        msgEl.textContent = 'Name and email are required.';
-        msgEl.className = 'login-msg error';
-        return;
-    }
-    if (!password) {
-        msgEl.textContent = 'A password is required.';
-        msgEl.className = 'login-msg error';
-        return;
-    }
-    if (password.length < 8) {
-        msgEl.textContent = 'Password must be at least 8 characters.';
-        msgEl.className = 'login-msg error';
-        return;
-    }
-    if (password !== confirm) {
-        msgEl.textContent = 'Passwords do not match.';
-        msgEl.className = 'login-msg error';
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Creating…';
-    msgEl.className = 'login-msg';
-
-    let createdUser = null;
-    try {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        createdUser = cred.user;
-        await completePermanentAdminSetup(createdUser, { name, dept });
-        toast('✅ Permanent admin created. You are now signed in.', 4000);
-    } catch (e) {
-        bootstrapCreatePromise = null;
-        bootstrapUid = null;
-        const msgs = {
-            'auth/email-already-in-use': 'An account with that email already exists.',
-            'auth/invalid-email':        'Invalid email address.',
-            'auth/weak-password':        'Password is too weak. Use at least 8 characters.',
-            'auth/operation-not-allowed':'Email/password login is not enabled in Firebase.',
-            'permission-denied':         'First-time admin setup is blocked by Firestore rules.'
-        };
-        msgEl.textContent = msgs[e.code] || 'Error: ' + e.message;
-        msgEl.className = 'login-msg error';
-        if (createdUser) {
-            try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
-                console.warn('Initial setup lock cleanup failed; delete config/bootstrap if first-run setup stays blocked:', cleanupErr);
-                toast('Initial setup cleanup failed. Delete config/bootstrap if first-run setup stays blocked.', 7000);
-            }
-            try { await deleteUser(createdUser); } catch (cleanupErr) {
-                console.warn('Initial admin cleanup failed:', cleanupErr);
-                toast('Initial admin setup could not be fully rolled back. Try again or contact support.', 7000);
-            }
-        }
-        try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Create Permanent Admin';
-    }
-};
-
-window.setupAdmin = async function() {
-    const name      = document.getElementById('b-name').value.trim();
-    const email     = normalizeEmail(document.getElementById('b-email').value);
-    const dept      = document.getElementById('b-dept').value.trim();
-    const setupCode = document.getElementById('b-code').value.trim();
-    const password  = document.getElementById('b-password').value;
-    const confirm   = document.getElementById('b-confirm').value;
-
-    if (!name || !email) { modalMsg('bootstrap', 'Name and email are required.', 'error'); return; }
-    if (!hasBootstrapCode()) {
-        modalMsg('bootstrap', 'Update BOOTSTRAP_CODE in index.html and firestore.rules before continuing.', 'error');
-        return;
-    }
-    if (setupCode !== BOOTSTRAP_CODE) {
-        modalMsg('bootstrap', setupCode ? 'Invalid setup code.' : 'Setup code is required.', 'error');
-        return;
-    }
-    const ackCheckbox = document.getElementById('b-default-ack');
-    if (isDefaultBootstrapCode() && (!ackCheckbox || !ackCheckbox.checked)) {
-        modalMsg('bootstrap', 'Confirm that you will rotate the default setup code after creating your permanent admin.', 'error');
-        return;
-    }
-    if (!password) { modalMsg('bootstrap', 'A password is required.', 'error'); return; }
-    if (password.length < 8) { modalMsg('bootstrap', 'Password must be at least 8 characters.', 'error'); return; }
-    if (password !== confirm) { modalMsg('bootstrap', 'Passwords do not match.', 'error'); return; }
-
-    const btn = document.getElementById('setup-admin-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Creating…';
-
-    let createdUser = null;
-    try {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        createdUser = cred.user;
-        await completePermanentAdminSetup(createdUser, { name, dept, bootstrapCode: setupCode });
-        await cleanupBootstrapCode(doc(db, 'users', createdUser.uid), true);
-        bootstrapCreatePromise = null;
-        bootstrapUid = null;
-        closeModal('bootstrap');
-        toast('✅ Admin account created. You are now signed in.', 4000);
-    } catch (e) {
-        bootstrapCreatePromise = null;
-        bootstrapUid = null;
-        const msgs = {
-            'auth/email-already-in-use': 'An account with that email already exists.',
-            'auth/invalid-email':        'Invalid email address.',
-            'auth/weak-password':        'Password is too weak. Use at least 8 characters.',
-            'auth/operation-not-allowed': 'Email/password login is not enabled in Firebase.',
-            'permission-denied':         'Bootstrap setup is blocked by Firestore rules.'
-        };
-        modalMsg('bootstrap', msgs[e.code] || 'Error: ' + e.message, 'error');
-        if (createdUser) {
-            try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
-                console.warn('Bootstrap lock cleanup failed; delete config/bootstrap if bootstrap setup stays blocked:', cleanupErr);
-                toast('Bootstrap cleanup failed. Delete config/bootstrap if setup stays blocked.', 7000);
-            }
-            try { await deleteUser(createdUser); } catch (cleanupErr) {
-                console.warn('Bootstrap account cleanup failed:', cleanupErr);
-                toast('Bootstrap account created without a profile. Delete it in Firebase Auth or contact support.', 7000);
-            }
-        }
-        try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Create Admin';
-    }
-};
-
 // Allow pressing Enter to submit
 ['l-email','l-password'].forEach(id => {
     document.getElementById(id).addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); window.doLogin(); }
-    });
-});
-
-['fr-name','fr-email','fr-dept','fr-password','fr-confirm'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); window.createInitialAdmin(); }
     });
 });
 
@@ -1597,33 +1201,17 @@ window.doLogout = async function() {
     await signOut(auth);
 };
 
-async function needsFirstRunSetup(forceRefresh = false) {
-    if (!forceRefresh && firstRunSetupRequired !== null) return firstRunSetupRequired;
-    try {
-        const snap = await getDoc(doc(db, 'config', 'bootstrap'));
-        const data = snap.exists() ? snap.data() : null;
-        // Only an explicit initialized === true means bootstrap finished; missing or malformed state should return to setup.
-        firstRunSetupRequired = !data || data.initialized !== true;
-    } catch (e) {
-        console.warn('Unable to determine first-run setup state:', e);
-        // A permission-denied read here means config/bootstrap exists but is still in the private, unfinished reservation state.
-        firstRunSetupRequired = e?.code === 'permission-denied';
-    }
-    return firstRunSetupRequired;
-}
-
 // ── Auth state watcher ───────────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
     if (!user) {
         currentUser    = null;
         currentProfile = null;
-        await showEntryScreen(true);
+        showLogin();
         return;
     }
     currentUser = user;
     try {
         await loadProfile(user);
-        firstRunSetupRequired = false;
         showApp();
     } catch (e) {
         await signOut(auth);
@@ -1636,10 +1224,6 @@ onAuthStateChanged(auth, async (user) => {
 async function loadProfile(user) {
     // Try UID-keyed doc first
     let snap = await getDoc(doc(db, 'users', user.uid));
-    if (!snap.exists() && bootstrapCreatePromise && bootstrapUid === user.uid) {
-        await bootstrapCreatePromise;
-        snap = await getDoc(doc(db, 'users', user.uid));
-    }
     if (!snap.exists()) {
         // Fallback: find by email (legacy data)
         const q = query(collection(db, 'users'), where('email', '==', user.email));
@@ -1649,11 +1233,6 @@ async function loadProfile(user) {
     }
     const data = snap.data();
     if (!isUserActive(data)) throw new Error('inactive');
-    if (data.bootstrapCode && data.role === 'admin' && !bootstrapCleanupAttempted.has(snap.id)) {
-        bootstrapCleanupAttempted.add(snap.id);
-        const cleaned = await cleanupBootstrapCode(snap.ref);
-        if (cleaned) data.bootstrapCode = undefined;
-    }
     currentProfile = data;
 }
 
@@ -1661,7 +1240,6 @@ async function loadProfile(user) {
 function showLogin() {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('sign-in-card').style.display = 'block';
-    document.getElementById('first-run-card').style.display = 'none';
     document.getElementById('login-help').style.display = 'block';
     document.getElementById('app').style.display = 'none';
     const btn = document.getElementById('login-btn');
@@ -1670,35 +1248,8 @@ function showLogin() {
     resetOrbMenuState();
 }
 
-function showFirstRunSetup() {
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('sign-in-card').style.display = 'none';
-    document.getElementById('first-run-card').style.display = 'block';
-    document.getElementById('login-help').style.display = 'none';
-    document.getElementById('app').style.display = 'none';
-    prefillDefaultAdminForm();
-    const btn = document.getElementById('first-run-btn');
-    btn.disabled = false;
-    btn.textContent = 'Create Permanent Admin';
-    resetOrbMenuState();
-}
-
-async function showEntryScreen(forceRefresh = false) {
-    if (await needsFirstRunSetup(forceRefresh)) {
-        // Auto-provision signs the default admin in, so the auth state watcher will continue into the app.
-        if (await ensureDefaultAdminAccount()) return;
-        showFirstRunSetup();
-        return;
-    }
-    showLogin();
-}
-
 window.showLoginScreen = function() {
     showLogin();
-};
-
-window.showFirstRunSetupScreen = function() {
-    showFirstRunSetup();
 };
 
 function showApp() {
@@ -2495,20 +2046,6 @@ window.openModal  = function(name) {
         });
         document.querySelectorAll('.pw-toggle').forEach(b => b.textContent = '👁');
         document.getElementById('modal-user-msg').className = 'modal-msg';
-    }
-    if (name === 'bootstrap') {
-        ['b-name','b-email','b-dept','b-code','b-password','b-confirm'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        const bootstrapAck = document.getElementById('b-default-ack');
-        if (bootstrapAck) bootstrapAck.checked = false;
-        ['b-code','b-password','b-confirm'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.type = 'password';
-        });
-        document.querySelectorAll('#modal-bootstrap .pw-toggle').forEach(b => b.textContent = '👁');
-        document.getElementById('modal-bootstrap-msg').className = 'modal-msg';
     }
 };
 window.closeModal = function(name) {
