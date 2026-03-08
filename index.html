@@ -1076,6 +1076,39 @@ const authPersistenceSettled = authPersistenceReady.catch(e => {
     console.warn('Auth persistence setup failed; continuing without configured local persistence.', e);
 });
 const db   = getFirestore(app);
+// ── TEMPORARY DEV AUTO-LOGIN ──────────────────────────────────────
+const isDevHost = window.location.hostname === 'localhost'
+    || window.location.hostname === '127.0.0.1';
+const devAdminEmail = 'admin@bophelong.local';
+const devAdminPassword = '12345678';
+let devAutoLoginAttempted = false;
+
+async function maybeRunDevAutoLogin() {
+    if (!isDevHost || devAutoLoginAttempted || auth.currentUser) return false;
+    devAutoLoginAttempted = true;
+
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, devAdminEmail, devAdminPassword);
+        console.log('🔧 Dev auto-login successful →', userCredential.user.email);
+        return true;
+    } catch (error) {
+        if (error.code === 'auth/user-not-found') {
+            console.warn('Dev admin user not found. Creating...');
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, devAdminEmail, devAdminPassword);
+                console.log('🔧 Dev admin created & logged in →', userCredential.user.email);
+                console.warn('Create a matching Firestore users profile for this local dev account if you need app access.');
+                return true;
+            } catch (createErr) {
+                console.error('Dev auto-create failed', createErr);
+            }
+        } else {
+            console.error('Dev auto-login failed', error);
+        }
+    }
+
+    return false;
+}
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
 let currentProfile = null;  // Firestore profile { role, name, … }
@@ -1210,6 +1243,7 @@ window.doLogout = async function() {
 authPersistenceSettled.finally(() => {
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
+            if (await maybeRunDevAutoLogin()) return;
             currentUser    = null;
             currentProfile = null;
             showLogin();
