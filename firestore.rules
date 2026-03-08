@@ -75,6 +75,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['name','email','dept','role','active','uid','createdAt'])
         && request.resource.data.keys().hasOnly(['name','email','dept','role','active','uid','createdAt'])
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
         && request.resource.data.createdAt is timestamp
         && isPermanentAdminData(request.resource.data);
     }

@@ -1244,6 +1244,16 @@ function parseAmount(value) {
     return match[1] ? -num : num;
 }
 
+function normalizeEmail(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function requireAuthEmail(user) {
+    const email = normalizeEmail(user && user.email);
+    if (!email) throw new Error('User authentication succeeded but no email was returned by Firebase Auth.');
+    return email;
+}
+
 function statusBadge(s) {
     const map = {
         active: 'badge-green', critical: 'badge-red', stable: 'badge-blue',
@@ -1262,7 +1272,7 @@ function roleBadgeHTML(role) {
 
 // ── Login ────────────────────────────────────────────────────────────
 window.doLogin = async function() {
-    const email = document.getElementById('l-email').value.trim();
+    const email = normalizeEmail(document.getElementById('l-email').value);
     const pass  = document.getElementById('l-password').value;
     const btn   = document.getElementById('login-btn');
     const msgEl = document.getElementById('login-msg');
@@ -1297,7 +1307,7 @@ window.doLogin = async function() {
 
 window.createInitialAdmin = async function() {
     const name     = document.getElementById('fr-name').value.trim();
-    const email    = document.getElementById('fr-email').value.trim();
+    const email    = normalizeEmail(document.getElementById('fr-email').value);
     const dept     = document.getElementById('fr-dept').value.trim() || 'Administration';
     const password = document.getElementById('fr-password').value;
     const confirm  = document.getElementById('fr-confirm').value;
@@ -1334,13 +1344,14 @@ window.createInitialAdmin = async function() {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         createdUser = cred.user;
         const newUid = createdUser.uid;
+        const profileEmail = requireAuthEmail(createdUser);
         bootstrapUid = newUid;
         bootstrapCreatePromise = (async () => {
             await setDoc(doc(db, 'config', 'bootstrap'), {
                 uid: newUid, initialized: false, reservedAt: serverTimestamp()
             });
             await setDoc(doc(db, 'users', newUid), {
-                name, email, dept, role: 'admin', active: true, uid: newUid,
+                name, email: profileEmail, dept, role: 'admin', active: true, uid: newUid,
                 createdAt: serverTimestamp()
             });
             await setDoc(doc(db, 'config', 'bootstrap'), {
@@ -1383,7 +1394,7 @@ window.createInitialAdmin = async function() {
 
 window.setupAdmin = async function() {
     const name      = document.getElementById('b-name').value.trim();
-    const email     = document.getElementById('b-email').value.trim();
+    const email     = normalizeEmail(document.getElementById('b-email').value);
     const dept      = document.getElementById('b-dept').value.trim();
     const setupCode = document.getElementById('b-code').value.trim();
     const password  = document.getElementById('b-password').value;
@@ -1416,13 +1427,14 @@ window.setupAdmin = async function() {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         createdUser = cred.user;
         const newUid = createdUser.uid;
+        const profileEmail = requireAuthEmail(createdUser);
         bootstrapUid = newUid;
         bootstrapCreatePromise = (async () => {
             await setDoc(doc(db, 'config', 'bootstrap'), {
                 uid: newUid, initialized: false, reservedAt: serverTimestamp()
             });
             await setDoc(doc(db, 'users', newUid), {
-                name, email, dept, role: 'admin', active: true, uid: newUid,
+                name, email: profileEmail, dept, role: 'admin', active: true, uid: newUid,
                 createdAt: serverTimestamp(), bootstrapCode: setupCode
             });
             await setDoc(doc(db, 'config', 'bootstrap'), {
@@ -2420,7 +2432,7 @@ window.saveResident = async function() {
 // ── Save User ────────────────────────────────────────────────────────────
 window.saveUser = async function() {
     const name     = document.getElementById('u-name').value.trim();
-    const email    = document.getElementById('u-email').value.trim();
+    const email    = normalizeEmail(document.getElementById('u-email').value);
     const dept     = document.getElementById('u-dept').value.trim();
     const role     = document.getElementById('u-role').value;
     const password = document.getElementById('u-password').value;
@@ -2447,11 +2459,12 @@ window.saveUser = async function() {
         const secondaryAuth = getAuth(secondaryApp);
         const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
         const newUid = cred.user.uid;
+        const profileEmail = requireAuthEmail(cred.user);
         await signOut(secondaryAuth);
 
         // Store the Firestore profile keyed by the new UID (consistent with loadProfile)
         await setDoc(doc(db, 'users', newUid), {
-            name, email, dept, role, active: true, uid: newUid, createdAt: serverTimestamp()
+            name, email: profileEmail, dept, role, active: true, uid: newUid, createdAt: serverTimestamp()
         });
 
         await logActivity(`Admin created new user: ${name} (${role})`);
