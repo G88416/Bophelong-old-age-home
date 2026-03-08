@@ -8,7 +8,7 @@ service cloud.firestore {
     function bootstrapCode() {
       // Must match BOOTSTRAP_CODE in index.html for temporary setup.
       // Do not deploy with the default value.
-      return 'BophelongDemoAdmin2026';
+      return 'CHANGE_ME_BEFORE_DEPLOYMENT';
     }
 
     function bootstrapKeys() {
@@ -44,7 +44,6 @@ service cloud.firestore {
     function isBootstrapAdminCreate(userId) {
       return isSignedIn()
         && request.auth.uid == userId
-        && bootstrapCode() != 'CHANGE_ME_BEFORE_DEPLOYMENT'
         && !isBootstrapLocked()
         && request.resource.data.keys().hasAll(bootstrapKeys())
         && request.resource.data.keys().hasOnly(bootstrapKeys())
