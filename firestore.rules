@@ -30,6 +30,10 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/config/bootstrap);
     }
 
+    function bootstrapLockDoc() {
+      return get(/databases/$(database)/documents/config/bootstrap);
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -67,7 +71,7 @@ service cloud.firestore {
     function isInitialAdminCreate(userId) {
       return isSignedIn()
         && request.auth.uid == userId
-        && !isBootstrapLocked()
+        && isBootstrapReservationOwner()
         && request.resource.data.keys().hasAll(['name','email','dept','role','active','uid','createdAt'])
         && request.resource.data.keys().hasOnly(['name','email','dept','role','active','uid','createdAt'])
         && request.resource.data.uid == request.auth.uid
@@ -76,20 +80,45 @@ service cloud.firestore {
         && isPermanentAdminData(request.resource.data);
     }
 
-    function isBootstrapLockDoc(data) {
+    function isBootstrapReservationDoc(data) {
+      return data.keys().hasAll(['uid', 'initialized', 'reservedAt'])
+        && data.keys().hasOnly(['uid', 'initialized', 'reservedAt'])
+        && data.get('uid', '') == request.auth.uid
+        && data.get('initialized', true) == false
+        && data.get('reservedAt', null) is timestamp;
+    }
+
+    function isBootstrapReservationOwner() {
+      let lockDoc = bootstrapLockDoc();
+      return isSignedIn()
+        && lockDoc.exists()
+        && lockDoc.data.get('uid', '') == request.auth.uid
+        && lockDoc.data.get('initialized', true) == false;
+    }
+
+    function isPublicBootstrapState(data) {
       return data.keys().hasAll(['initialized', 'usedAt'])
         && data.keys().hasOnly(['initialized', 'usedAt'])
         && data.get('initialized', false) == true
         && data.get('usedAt', null) is timestamp;
     }
 
+    function isBootstrapFinalizeDoc(data) {
+      return isPublicBootstrapState(data);
+    }
+
     function isBootstrapLockCreate() {
-      let bootstrapUserDoc = userDoc();
       return isSignedIn()
         && !isBootstrapLocked()
-        && isBootstrapLockDoc(request.resource.data)
-        && bootstrapUserDoc.exists()
-        && isBootstrapAdminData(bootstrapUserDoc.data);
+        && isBootstrapReservationDoc(request.resource.data);
+    }
+
+    function isBootstrapLockFinalize() {
+      let adminUserDoc = userDoc();
+      return isBootstrapReservationOwner()
+        && isBootstrapFinalizeDoc(request.resource.data)
+        && adminUserDoc.exists()
+        && isPermanentAdminData(adminUserDoc.data);
     }
 
     match /users/{userId} {
@@ -99,12 +128,11 @@ service cloud.firestore {
     }
 
     match /config/bootstrap {
-      allow get: if true;
+      allow get: if resource == null || isAdmin() || isPublicBootstrapState(resource.data);
       allow list: if false;
-      allow create: if !isBootstrapLocked()
-        && isBootstrapLockDoc(request.resource.data)
-        && (isAdmin() || isBootstrapLockCreate());
-      allow update, delete: if false;
+      allow create: if isBootstrapLockCreate();
+      allow update: if isBootstrapLockFinalize();
+      allow delete: if isBootstrapReservationOwner();
     }
 
     match /activities/{activityId} {

@@ -1298,7 +1298,7 @@ window.doLogin = async function() {
 window.createInitialAdmin = async function() {
     const name     = document.getElementById('fr-name').value.trim();
     const email    = document.getElementById('fr-email').value.trim();
-    const dept     = document.getElementById('fr-dept').value.trim();
+    const dept     = document.getElementById('fr-dept').value.trim() || 'Administration';
     const password = document.getElementById('fr-password').value;
     const confirm  = document.getElementById('fr-confirm').value;
     const btn      = document.getElementById('first-run-btn');
@@ -1336,6 +1336,9 @@ window.createInitialAdmin = async function() {
         const newUid = createdUser.uid;
         bootstrapUid = newUid;
         bootstrapCreatePromise = (async () => {
+            await setDoc(doc(db, 'config', 'bootstrap'), {
+                uid: newUid, initialized: false, reservedAt: serverTimestamp()
+            });
             await setDoc(doc(db, 'users', newUid), {
                 name, email, dept, role: 'admin', active: true, uid: newUid,
                 createdAt: serverTimestamp()
@@ -1362,9 +1365,13 @@ window.createInitialAdmin = async function() {
         msgEl.textContent = msgs[e.code] || 'Error: ' + e.message;
         msgEl.className = 'login-msg error';
         if (createdUser) {
+            try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
+                console.warn('Initial setup lock cleanup failed; delete config/bootstrap if first-run setup stays blocked:', cleanupErr);
+                toast('Initial setup cleanup failed. Delete config/bootstrap if first-run setup stays blocked.', 7000);
+            }
             try { await deleteUser(createdUser); } catch (cleanupErr) {
                 console.warn('Initial admin cleanup failed:', cleanupErr);
-                toast('Admin auth account was created without a profile. Delete it in Firebase Auth or contact support.', 7000);
+                toast('Initial admin setup could not be fully rolled back. Try again or contact support.', 7000);
             }
         }
         try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
@@ -1411,6 +1418,9 @@ window.setupAdmin = async function() {
         const newUid = createdUser.uid;
         bootstrapUid = newUid;
         bootstrapCreatePromise = (async () => {
+            await setDoc(doc(db, 'config', 'bootstrap'), {
+                uid: newUid, initialized: false, reservedAt: serverTimestamp()
+            });
             await setDoc(doc(db, 'users', newUid), {
                 name, email, dept, role: 'admin', active: true, uid: newUid,
                 createdAt: serverTimestamp(), bootstrapCode: setupCode
@@ -1437,6 +1447,10 @@ window.setupAdmin = async function() {
         };
         modalMsg('bootstrap', msgs[e.code] || 'Error: ' + e.message, 'error');
         if (createdUser) {
+            try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
+                console.warn('Bootstrap lock cleanup failed; delete config/bootstrap if bootstrap setup stays blocked:', cleanupErr);
+                toast('Bootstrap cleanup failed. Delete config/bootstrap if setup stays blocked.', 7000);
+            }
             try { await deleteUser(createdUser); } catch (cleanupErr) {
                 console.warn('Bootstrap account cleanup failed:', cleanupErr);
                 toast('Bootstrap account created without a profile. Delete it in Firebase Auth or contact support.', 7000);
