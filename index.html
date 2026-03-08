@@ -1129,7 +1129,7 @@ function normalizeEmail(value) {
 }
 
 function isUserActive(profile) {
-    return !!profile && profile.active !== false;
+    return !!profile && profile.active === true;
 }
 
 function requireAuthEmail(user) {
@@ -1239,17 +1239,9 @@ async function loadProfile(user) {
             qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
         }
         if (qs.empty) {
-            // Final fallback keeps older mixed-case email records sign-in compatible.
-            qs = await getDocs(usersRef);
-            const legacyMatch = qs.docs.find(d => {
-                const data = d.data();
-                return data.uid === user.uid || (!!data.email && normalizeEmail(data.email) === normalizedEmail);
-            });
-            if (!legacyMatch) throw new Error('no-profile');
-            snap = legacyMatch;
-        } else {
-            snap = qs.docs[0];
+            throw new Error('no-profile');
         }
+        snap = qs.docs[0];
     }
     const data = snap.data();
     if (!isUserActive(data)) throw new Error('inactive');
@@ -1548,13 +1540,23 @@ function updateClock() {
 // ── Dashboard ─────────────────────────────────────────────────────────
 async function loadDashboardStats() {
     try {
-        const [rSnap, uSnap, tSnap, lSnap, dSnap] = await Promise.all([
+        const role = currentProfile.role;
+        const baseQueries = [
             getDocs(collection(db, 'residents')),
-            getDocs(collection(db, 'users')),
             getDocs(collection(db, 'tasks')),
-            getDocs(collection(db, 'leaves')),
-            getDocs(collection(db, 'donations')),
-        ]);
+            role === 'admin'
+                ? getDocs(collection(db, 'leaves'))
+                : getDocs(query(collection(db, 'leaves'), where('staffUid', '==', currentUser.uid))),
+        ];
+        const [rSnap, tSnap, lSnap] = await Promise.all(baseQueries);
+        let uSnap = null;
+        let dSnap = null;
+        if (role === 'admin') {
+            [uSnap, dSnap] = await Promise.all([
+                getDocs(collection(db, 'users')),
+                getDocs(collection(db, 'donations')),
+            ]);
+        }
 
         const criticalCount   = rSnap.docs.filter(d => d.data().status === 'critical').length;
         const stableCount     = rSnap.docs.filter(d => d.data().status === 'stable').length;
@@ -1566,20 +1568,25 @@ async function loadDashboardStats() {
         const highPriority    = tSnap.docs.filter(d => d.data().priority === 'high' && d.data().status === 'pending').length;
         const taskRate        = tSnap.size > 0 ? Math.round((completedTasks / tSnap.size) * 100) : 0;
 
-        const pendingLeaves = lSnap.docs.filter(d => d.data().status === 'pending').length;
-        const activeStaff   = uSnap.docs.filter(d => isUserActive(d.data())).length;
+        const pendingLeaves = role === 'admin'
+            ? lSnap.docs.filter(d => d.data().status === 'pending').length
+            : 0;
+        const activeStaff   = role === 'admin'
+            ? uSnap.docs.filter(d => isUserActive(d.data())).length
+            : 0;
 
         let totalDonations = 0;
-        dSnap.docs.forEach(d => {
-            const dn = d.data();
-            if (dn.type === 'monetary' || dn.type === 'grant') {
-                // Extract first valid decimal number from the amount string
-                const match = String(dn.amount || '').match(/[0-9]+(?:\.[0-9]+)?/);
-                if (match) totalDonations += parseFloat(match[0]);
-            }
-        });
+        if (role === 'admin') {
+            dSnap.docs.forEach(d => {
+                const dn = d.data();
+                if (dn.type === 'monetary' || dn.type === 'grant') {
+                    // Extract first valid decimal number from the amount string
+                    const match = String(dn.amount || '').match(/[0-9]+(?:\.[0-9]+)?/);
+                    if (match) totalDonations += parseFloat(match[0]);
+                }
+            });
+        }
 
-        const role = currentProfile.role;
         let cards = [
             { label: 'Total Residents', value: rSnap.size, sub: `${criticalCount} critical`, cls: 'purple', icon: '🧓' },
             { label: 'Pending Tasks',  value: pendingTasks, sub: `${taskRate}% completed`, cls: 'amber', icon: '✅' },
@@ -1588,6 +1595,10 @@ async function loadDashboardStats() {
             cards.push({ label: 'Active Staff',    value: activeStaff,   sub: `of ${uSnap.size} registered`, cls: 'cyan',  icon: '👥' });
             cards.push({ label: 'Leave Requests',  value: pendingLeaves, sub: 'awaiting approval',           cls: 'green', icon: '🗓️' });
             cards.push({ label: 'Total Donations', value: `R ${totalDonations.toLocaleString()}`, sub: `${dSnap.size} donations recorded`, cls: 'rose', icon: '💰' });
+        } else {
+            cards.push({ label: 'My Leave Requests', value: lSnap.size, sub: 'requests on record', cls: 'green', icon: '🗓️' });
+            cards.push({ label: 'Stable Residents',  value: stableCount, sub: `${dischargedCount} discharged`, cls: 'cyan', icon: '🏠' });
+            cards.push({ label: 'High Priority Tasks', value: highPriority, sub: `${completedTasks} completed`, cls: 'rose', icon: '⚠️' });
         }
 
         const grid = document.getElementById('stats-grid');
@@ -1995,9 +2006,13 @@ async function loadLeaves() {
         }
 
         // Build a uid→name map for readable staff names
-        const usersSnap = await getDocs(collection(db, 'users'));
         const usersMap  = {};
-        usersSnap.docs.forEach(d => { usersMap[d.id] = d.data().name || d.id; });
+        if (role === 'admin') {
+            const usersSnap = await getDocs(collection(db, 'users'));
+            usersSnap.docs.forEach(d => { usersMap[d.id] = d.data().name || d.id; });
+        } else {
+            usersMap[currentUser.uid] = currentProfile.name || currentUser.uid;
+        }
 
         tb.innerHTML = snap.docs.map(d => {
             const lv = d.data();

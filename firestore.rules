@@ -10,15 +10,64 @@ service cloud.firestore {
         && data.get('active', false);
     }
 
+    function authEmail() {
+      return isSignedIn() && request.auth.token.email != null
+        ? request.auth.token.email
+        : '';
+    }
+
     function userDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function isAdmin() {
+    function isActiveUser() {
       return isSignedIn()
         && userDoc().exists()
-        && userDoc().data.get('active', false)
-        && userDoc().data.get('role', '') == 'admin';
+        && userDoc().data.get('active', false);
+    }
+
+    function hasRole(role) {
+      return isActiveUser()
+        && userDoc().data.get('role', '') == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isDoctor() {
+      return hasRole('doctor');
+    }
+
+    function canManageResidents() {
+      return isAdmin() || isDoctor();
+    }
+
+    function isOwnUserDoc(userId) {
+      return isSignedIn()
+        && (
+          userId == request.auth.uid
+          || resource.data.get('uid', '') == request.auth.uid
+          || resource.data.get('email', '') == authEmail()
+        )
+        && resource.data.get('active', false);
+    }
+
+    function isValidRole(role) {
+      return role == 'admin' || role == 'staff' || role == 'doctor';
+    }
+
+    function isUserPayload(data, userId) {
+      return data.keys().hasAll(['name', 'email', 'role', 'active', 'uid'])
+        && data.name is string
+        && data.name.size() > 0
+        && data.email is string
+        && data.email.size() > 0
+        && (!data.keys().hasAll(['dept']) || data.dept is string)
+        && data.active is bool
+        && isValidRole(data.role)
+        && data.uid == userId
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp);
     }
 
     function hasStaffUid(data) {
@@ -28,19 +77,21 @@ service cloud.firestore {
     function isActivityPayload() {
       return request.resource.data.keys().hasAll(['msg', 'date', 'uid'])
         && request.resource.data.msg is string
+        && request.resource.data.msg.size() > 0
+        && request.resource.data.msg.size() <= 1000
         && request.resource.data.date is timestamp
         && request.resource.data.uid == request.auth.uid;
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow read: if isAdmin() || isOwnUserDoc(userId);
+      allow create, update: if isAdmin() && isUserPayload(request.resource.data, userId);
+      allow delete: if isAdmin();
     }
 
     match /activities/{activityId} {
       allow read: if isAdmin();
-      allow create: if isSignedIn() && isActivityPayload();
+      allow create: if isActiveUser() && isActivityPayload();
       allow update, delete: if isAdmin();
     }
 
@@ -58,8 +109,8 @@ service cloud.firestore {
 
     match /leaves/{leaveId} {
       allow read: if isAdmin()
-        || (isSignedIn() && resource != null && resource.data.staffUid == request.auth.uid);
-      allow create: if isSignedIn()
+        || (isActiveUser() && resource != null && resource.data.staffUid == request.auth.uid);
+      allow create: if isActiveUser()
         && hasStaffUid(request.resource.data)
         && request.resource.data.staffUid == request.auth.uid;
       allow update: if isAdmin()
@@ -70,15 +121,18 @@ service cloud.firestore {
     }
 
     match /residents/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, create: if isActiveUser();
+      allow update, delete: if canManageResidents();
     }
 
     match /tasks/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, create, update: if isActiveUser();
+      allow delete: if isAdmin();
     }
 
     match /medications/{docId} {
-      allow read, write: if isSignedIn();
+      allow read, create: if isActiveUser();
+      allow update, delete: if isAdmin();
     }
   }
 }
