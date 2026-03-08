@@ -1222,17 +1222,24 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 async function loadProfile(user) {
-    const authEmail = requireAuthEmail(user);
+    const rawAuthEmail = String((user && user.email) || '').trim();
+    const normalizedAuthEmail = requireAuthEmail(user);
     // Try UID-keyed doc first
     let snap = await getDoc(doc(db, 'users', user.uid));
     if (!snap.exists()) {
         // Fallback: find by email (legacy data)
-        const normalizedEmail = normalizeEmail(authEmail);
-        const q = query(collection(db, 'users'), where('email', '==', normalizedEmail));
-        let qs = await getDocs(q);
+        const usersRef = collection(db, 'users');
+        const normalizedEmail = normalizedAuthEmail;
+        let qs = rawAuthEmail ? await getDocs(query(usersRef, where('email', '==', rawAuthEmail))) : { empty: true };
+        if (qs.empty && rawAuthEmail !== normalizedEmail) {
+            qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
+        }
         if (qs.empty) {
-            qs = await getDocs(collection(db, 'users'));
-            const legacyMatch = qs.docs.find(d => normalizeEmail(d.data().email) === normalizedEmail);
+            qs = await getDocs(usersRef);
+            const legacyMatch = qs.docs.find(d => {
+                const data = d.data();
+                return !!data.email && normalizeEmail(data.email) === normalizedEmail;
+            });
             if (!legacyMatch) throw new Error('no-profile');
             snap = legacyMatch;
         } else {
