@@ -554,7 +554,7 @@
             <h1>Bophelong Olg Age Home</h1>
             <p>Staff &amp; Administration Portal</p>
         </div>
-        <div class="login-card">
+        <div class="login-card" id="sign-in-card">
             <h2>🔐 Sign In to Your Account</h2>
             <div class="form-group">
                 <label for="l-email">Email Address</label>
@@ -569,7 +569,36 @@
             <button class="btn btn-ghost login-alt-btn" id="bootstrap-btn" type="button" onclick="openModal('bootstrap')">Create demo admin account</button>
             <p class="login-help" id="bootstrap-default-note" hidden>The temporary default setup code is enabled for this build. Rotate it after you create your permanent admin.</p>
         </div>
-        <p class="login-help">Need access? Contact your administrator for your login credentials.</p>
+        <div class="login-card" id="first-run-card" style="display:none">
+            <h2>👑 Create Your Permanent Admin Account</h2>
+            <p style="color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
+                This is the first-time setup for the portal. Create the permanent admin account that you will use to manage the app.
+            </p>
+            <div class="form-group">
+                <label for="fr-name">Full Name</label>
+                <input type="text" id="fr-name" placeholder="Admin name" autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="fr-email">Email Address</label>
+                <input type="email" id="fr-email" placeholder="admin@example.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+                <label for="fr-dept">Department</label>
+                <input type="text" id="fr-dept" placeholder="Administration" autocomplete="organization">
+            </div>
+            <div class="form-group">
+                <label for="fr-password">Password</label>
+                <input type="password" id="fr-password" placeholder="Minimum 8 characters" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="fr-confirm">Confirm Password</label>
+                <input type="password" id="fr-confirm" placeholder="Repeat password" autocomplete="new-password">
+            </div>
+            <button class="login-btn" id="first-run-btn" onclick="createInitialAdmin()">Create Permanent Admin</button>
+            <div class="login-msg" id="first-run-msg"></div>
+            <button class="btn btn-ghost login-alt-btn" type="button" onclick="showLoginScreen()">I already have an account</button>
+        </div>
+        <p class="login-help" id="login-help">Need access? Contact your administrator for your login credentials.</p>
     </div>
 </div>
 
@@ -1133,6 +1162,7 @@ let usersAll       = [];    // full user rows for client-side filtering
 let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 const bootstrapCleanupAttempted = new Set();
+let firstRunSetupRequired = null;
 
 function hasBootstrapCode() {
     return BOOTSTRAP_CODE.trim().length > 0;
@@ -1143,18 +1173,11 @@ function isDefaultBootstrapCode() {
 }
 
 const bootstrapBtn = document.getElementById('bootstrap-btn');
-if (bootstrapBtn && !hasBootstrapCode()) {
-    bootstrapBtn.disabled = true;
-    bootstrapBtn.textContent = 'Set BOOTSTRAP_CODE to enable first-time setup';
-    const msgEl = document.getElementById('login-msg');
-    msgEl.textContent = 'Bootstrap setup is disabled until BOOTSTRAP_CODE is set.';
-    msgEl.className = 'login-msg info';
-} else if (isDefaultBootstrapCode()) {
-    const defaultNote = document.getElementById('bootstrap-default-note');
-    if (defaultNote) defaultNote.hidden = false;
-    const defaultAckWrap = document.getElementById('b-default-ack-wrap');
-    if (defaultAckWrap) defaultAckWrap.hidden = false;
-}
+if (bootstrapBtn) bootstrapBtn.hidden = true;
+const defaultNote = document.getElementById('bootstrap-default-note');
+if (defaultNote) defaultNote.hidden = true;
+const defaultAckWrap = document.getElementById('b-default-ack-wrap');
+if (defaultAckWrap) defaultAckWrap.hidden = true;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1272,6 +1295,92 @@ window.doLogin = async function() {
     }
 };
 
+window.createInitialAdmin = async function() {
+    const name     = document.getElementById('fr-name').value.trim();
+    const email    = document.getElementById('fr-email').value.trim();
+    const dept     = document.getElementById('fr-dept').value.trim() || 'Administration';
+    const password = document.getElementById('fr-password').value;
+    const confirm  = document.getElementById('fr-confirm').value;
+    const btn      = document.getElementById('first-run-btn');
+    const msgEl    = document.getElementById('first-run-msg');
+
+    if (!name || !email) {
+        msgEl.textContent = 'Name and email are required.';
+        msgEl.className = 'login-msg error';
+        return;
+    }
+    if (!password) {
+        msgEl.textContent = 'A password is required.';
+        msgEl.className = 'login-msg error';
+        return;
+    }
+    if (password.length < 8) {
+        msgEl.textContent = 'Password must be at least 8 characters.';
+        msgEl.className = 'login-msg error';
+        return;
+    }
+    if (password !== confirm) {
+        msgEl.textContent = 'Passwords do not match.';
+        msgEl.className = 'login-msg error';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Creating…';
+    msgEl.className = 'login-msg';
+
+    let createdUser = null;
+    try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        createdUser = cred.user;
+        const newUid = createdUser.uid;
+        bootstrapUid = newUid;
+        bootstrapCreatePromise = (async () => {
+            await setDoc(doc(db, 'config', 'bootstrap'), {
+                uid: newUid, initialized: false, reservedAt: serverTimestamp()
+            });
+            await setDoc(doc(db, 'users', newUid), {
+                name, email, dept, role: 'admin', active: true, uid: newUid,
+                createdAt: serverTimestamp()
+            });
+            await setDoc(doc(db, 'config', 'bootstrap'), {
+                initialized: true, usedAt: serverTimestamp()
+            });
+        })();
+        await bootstrapCreatePromise;
+        bootstrapCreatePromise = null;
+        bootstrapUid = null;
+        firstRunSetupRequired = false;
+        toast('✅ Permanent admin created. You are now signed in.', 4000);
+    } catch (e) {
+        bootstrapCreatePromise = null;
+        bootstrapUid = null;
+        const msgs = {
+            'auth/email-already-in-use': 'An account with that email already exists.',
+            'auth/invalid-email':        'Invalid email address.',
+            'auth/weak-password':        'Password is too weak. Use at least 8 characters.',
+            'auth/operation-not-allowed':'Email/password login is not enabled in Firebase.',
+            'permission-denied':         'First-time admin setup is blocked by Firestore rules.'
+        };
+        msgEl.textContent = msgs[e.code] || 'Error: ' + e.message;
+        msgEl.className = 'login-msg error';
+        if (createdUser) {
+            try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
+                console.warn('Initial setup lock cleanup failed; delete config/bootstrap if first-run setup stays blocked:', cleanupErr);
+                toast('Initial setup cleanup failed. Delete config/bootstrap if first-run setup stays blocked.', 7000);
+            }
+            try { await deleteUser(createdUser); } catch (cleanupErr) {
+                console.warn('Initial admin cleanup failed:', cleanupErr);
+                toast('Initial admin setup could not be fully rolled back. Try again or contact support.', 7000);
+            }
+        }
+        try { await signOut(auth); } catch (err) { console.warn('Sign out failed:', err); }
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Permanent Admin';
+    }
+};
+
 window.setupAdmin = async function() {
     const name      = document.getElementById('b-name').value.trim();
     const email     = document.getElementById('b-email').value.trim();
@@ -1309,12 +1418,15 @@ window.setupAdmin = async function() {
         const newUid = createdUser.uid;
         bootstrapUid = newUid;
         bootstrapCreatePromise = (async () => {
+            await setDoc(doc(db, 'config', 'bootstrap'), {
+                uid: newUid, initialized: false, reservedAt: serverTimestamp()
+            });
             await setDoc(doc(db, 'users', newUid), {
                 name, email, dept, role: 'admin', active: true, uid: newUid,
                 createdAt: serverTimestamp(), bootstrapCode: setupCode
             });
             await setDoc(doc(db, 'config', 'bootstrap'), {
-                usedAt: serverTimestamp(), uid: newUid
+                initialized: true, usedAt: serverTimestamp()
             });
         })();
         await bootstrapCreatePromise;
@@ -1335,6 +1447,10 @@ window.setupAdmin = async function() {
         };
         modalMsg('bootstrap', msgs[e.code] || 'Error: ' + e.message, 'error');
         if (createdUser) {
+            try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
+                console.warn('Bootstrap lock cleanup failed; delete config/bootstrap if bootstrap setup stays blocked:', cleanupErr);
+                toast('Bootstrap cleanup failed. Delete config/bootstrap if setup stays blocked.', 7000);
+            }
             try { await deleteUser(createdUser); } catch (cleanupErr) {
                 console.warn('Bootstrap account cleanup failed:', cleanupErr);
                 toast('Bootstrap account created without a profile. Delete it in Firebase Auth or contact support.', 7000);
@@ -1354,22 +1470,41 @@ window.setupAdmin = async function() {
     });
 });
 
+['fr-name','fr-email','fr-dept','fr-password','fr-confirm'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); window.createInitialAdmin(); }
+    });
+});
+
 // ── Logout ───────────────────────────────────────────────────────────
 window.doLogout = async function() {
     await signOut(auth);
 };
+
+async function needsFirstRunSetup(forceRefresh = false) {
+    if (!forceRefresh && firstRunSetupRequired !== null) return firstRunSetupRequired;
+    try {
+        const snap = await getDoc(doc(db, 'config', 'bootstrap'));
+        firstRunSetupRequired = !snap.exists();
+    } catch (e) {
+        console.warn('Unable to determine first-run setup state:', e);
+        firstRunSetupRequired = false;
+    }
+    return firstRunSetupRequired;
+}
 
 // ── Auth state watcher ───────────────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
     if (!user) {
         currentUser    = null;
         currentProfile = null;
-        showLogin();
+        await showEntryScreen(true);
         return;
     }
     currentUser = user;
     try {
         await loadProfile(user);
+        firstRunSetupRequired = false;
         showApp();
     } catch (e) {
         await signOut(auth);
@@ -1406,12 +1541,43 @@ async function loadProfile(user) {
 // ── Show / hide screens ──────────────────────────────────────────────
 function showLogin() {
     document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('sign-in-card').style.display = 'block';
+    document.getElementById('first-run-card').style.display = 'none';
+    document.getElementById('login-help').style.display = 'block';
     document.getElementById('app').style.display = 'none';
     const btn = document.getElementById('login-btn');
     btn.disabled = false;
     btn.textContent = 'Sign In';
     resetOrbMenuState();
 }
+
+function showFirstRunSetup() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('sign-in-card').style.display = 'none';
+    document.getElementById('first-run-card').style.display = 'block';
+    document.getElementById('login-help').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+    const btn = document.getElementById('first-run-btn');
+    btn.disabled = false;
+    btn.textContent = 'Create Permanent Admin';
+    resetOrbMenuState();
+}
+
+async function showEntryScreen(forceRefresh = false) {
+    if (await needsFirstRunSetup(forceRefresh)) {
+        showFirstRunSetup();
+        return;
+    }
+    showLogin();
+}
+
+window.showLoginScreen = function() {
+    showLogin();
+};
+
+window.showFirstRunSetupScreen = function() {
+    showFirstRunSetup();
+};
 
 function showApp() {
     document.getElementById('login-screen').style.display = 'none';
