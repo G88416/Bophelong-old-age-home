@@ -1071,11 +1071,10 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
-try {
-    await setPersistence(auth, browserLocalPersistence);
-} catch (e) {
-    console.warn('Auth persistence setup failed:', e);
-}
+const authPersistenceReady = setPersistence(auth, browserLocalPersistence);
+const authPersistenceSettled = authPersistenceReady.catch(e => {
+    console.warn('Auth persistence setup failed; continuing without configured local persistence.', e);
+});
 const db   = getFirestore(app);
 // ── State ──────────────────────────────────────────────────────────
 let currentUser   = null;   // Firebase Auth user
@@ -1177,6 +1176,7 @@ window.doLogin = async function() {
     msgEl.className = 'login-msg';
 
     try {
+        await authPersistenceSettled;
         await signInWithEmailAndPassword(auth, email, pass);
         // onAuthStateChanged handles the rest
     } catch (e) {
@@ -1207,23 +1207,25 @@ window.doLogout = async function() {
 };
 
 // ── Auth state watcher ───────────────────────────────────────────────
-onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-        currentUser    = null;
-        currentProfile = null;
-        showLogin();
-        return;
-    }
-    currentUser = user;
-    try {
-        await loadProfile(user);
-        showApp();
-    } catch (e) {
-        await signOut(auth);
-        const msgEl = document.getElementById('login-msg');
-        msgEl.textContent = 'Profile not found or account is inactive. Contact your administrator.';
-        msgEl.className = 'login-msg error';
-    }
+authPersistenceSettled.finally(() => {
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) {
+            currentUser    = null;
+            currentProfile = null;
+            showLogin();
+            return;
+        }
+        currentUser = user;
+        try {
+            await loadProfile(user);
+            showApp();
+        } catch (e) {
+            await signOut(auth);
+            const msgEl = document.getElementById('login-msg');
+            msgEl.textContent = 'Profile not found or account is inactive. Contact your administrator.';
+            msgEl.className = 'login-msg error';
+        }
+    });
 });
 
 async function loadProfile(user) {
