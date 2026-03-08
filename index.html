@@ -572,7 +572,7 @@
         <div class="login-card" id="first-run-card" style="display:none">
             <h2>👑 Create Your Permanent Admin Account</h2>
             <p style="color: var(--muted); margin-bottom: 16px; line-height: 1.5;">
-                This is the first-time setup for the portal. Create the permanent admin account that you will use to manage the app.
+                This is the first-time setup for the portal. The app will provision the default admin account automatically, and this form stays available as the fallback setup path.
             </p>
             <div class="form-group">
                 <label for="fr-name">Full Name</label>
@@ -598,7 +598,7 @@
             <div class="login-msg" id="first-run-msg"></div>
             <button class="btn btn-ghost login-alt-btn" type="button" onclick="showLoginScreen()">I already have an account</button>
         </div>
-        <p class="login-help" id="login-help">Need access? Contact your administrator for your login credentials.</p>
+        <p class="login-help" id="login-help">Default admin login: <strong>admin@admin.local</strong> / <strong>admin@123</strong>. Change this password after the first sign-in.</p>
     </div>
 </div>
 
@@ -1150,6 +1150,12 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 const BOOTSTRAP_CODE = 'CHANGE_ME_BEFORE_DEPLOYMENT'; // Temporary setup code for this build. Rotate after the permanent admin is created.
+const DEFAULT_ADMIN = Object.freeze({
+    name: 'Admin',
+    email: 'admin@admin.local',
+    dept: 'Administration',
+    password: 'admin@123'
+});
 const BOOTSTRAP_CLEANUP_MAX_ATTEMPTS = 2;
 const BOOTSTRAP_CLEANUP_DELAY_MS = 200;
 
@@ -1163,6 +1169,7 @@ let bootstrapCreatePromise = null;
 let bootstrapUid = null;
 const bootstrapCleanupAttempted = new Set();
 let firstRunSetupRequired = null;
+let defaultAdminProvisionPromise = null;
 
 function hasBootstrapCode() {
     return BOOTSTRAP_CODE.trim().length > 0;
@@ -1258,6 +1265,128 @@ function requireAuthEmail(user) {
     return email;
 }
 
+async function createBootstrapReservation(uid) {
+    await setDoc(doc(db, 'config', 'bootstrap'), {
+        uid, initialized: false, reservedAt: serverTimestamp()
+    });
+}
+
+async function finalizeBootstrapReservation() {
+    await setDoc(doc(db, 'config', 'bootstrap'), {
+        initialized: true, usedAt: serverTimestamp()
+    });
+}
+
+async function writePermanentAdminProfile(user, { name, dept, bootstrapCode } = {}) {
+    const uid = user.uid;
+    const data = {
+        name,
+        email: requireAuthEmail(user),
+        dept,
+        role: 'admin',
+        active: true,
+        uid,
+        createdAt: serverTimestamp()
+    };
+    if (bootstrapCode) data.bootstrapCode = bootstrapCode;
+    await setDoc(doc(db, 'users', uid), data);
+}
+
+async function completePermanentAdminSetup(user, profile) {
+    bootstrapUid = user.uid;
+    bootstrapCreatePromise = (async () => {
+        await createBootstrapReservation(user.uid);
+        await writePermanentAdminProfile(user, profile);
+        await finalizeBootstrapReservation();
+    })();
+    await bootstrapCreatePromise;
+    bootstrapCreatePromise = null;
+    bootstrapUid = null;
+    firstRunSetupRequired = false;
+}
+
+function prefillDefaultAdminForm() {
+    const defaults = {
+        'fr-name': DEFAULT_ADMIN.name,
+        'fr-email': DEFAULT_ADMIN.email,
+        'fr-dept': DEFAULT_ADMIN.dept
+    };
+    Object.entries(defaults).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input && !input.value) input.value = value;
+    });
+}
+
+async function ensureDefaultAdminAccount() {
+    if (defaultAdminProvisionPromise) return defaultAdminProvisionPromise;
+
+    defaultAdminProvisionPromise = (async () => {
+        const setupRequired = await needsFirstRunSetup(true);
+        if (!setupRequired) return false;
+
+        let createdUser = null;
+        let signedInExistingUser = false;
+        try {
+            let user;
+            try {
+                const cred = await createUserWithEmailAndPassword(auth, DEFAULT_ADMIN.email, DEFAULT_ADMIN.password);
+                user = cred.user;
+                createdUser = user;
+            } catch (err) {
+                if (err.code !== 'auth/email-already-in-use') throw err;
+                signedInExistingUser = true;
+                const cred = await signInWithEmailAndPassword(auth, DEFAULT_ADMIN.email, DEFAULT_ADMIN.password);
+                user = cred.user;
+            }
+
+            const profileSnap = await getDoc(doc(db, 'users', user.uid));
+            if (!profileSnap.exists()) {
+                await completePermanentAdminSetup(user, DEFAULT_ADMIN);
+            } else {
+                const profile = profileSnap.data();
+                if (profile.role !== 'admin' || !isUserActive(profile)) {
+                    const issue = profile.role !== 'admin'
+                        ? 'does not have admin access'
+                        : 'is inactive';
+                    const error = new Error(`The default admin account exists but ${issue}. Please contact your system administrator.`);
+                    error.code = 'default-admin-profile-invalid';
+                    throw error;
+                }
+                await createBootstrapReservation(user.uid);
+                await finalizeBootstrapReservation();
+                firstRunSetupRequired = false;
+            }
+            return true;
+        } catch (err) {
+            console.warn('Default admin provisioning failed:', err);
+            const msgEl = document.getElementById('first-run-msg');
+            if (msgEl) {
+                const detail = err && err.code === 'default-admin-profile-invalid'
+                    ? ` ${err.message}`
+                    : ' Please use the default credentials manually or contact your system administrator.';
+                msgEl.textContent = `Unable to provision the default admin automatically.${detail}`;
+                msgEl.className = 'login-msg error';
+            }
+            if (createdUser) {
+                try { await deleteDoc(doc(db, 'config', 'bootstrap')); } catch (cleanupErr) {
+                    console.warn('Default admin bootstrap cleanup failed:', cleanupErr);
+                }
+                try { await deleteUser(createdUser); } catch (cleanupErr) {
+                    console.warn('Default admin auth cleanup failed:', cleanupErr);
+                }
+            }
+            if (signedInExistingUser) {
+                try { await signOut(auth); } catch (signOutErr) { console.warn('Sign out failed:', signOutErr); }
+            }
+            return false;
+        } finally {
+            defaultAdminProvisionPromise = null;
+        }
+    })();
+
+    return defaultAdminProvisionPromise;
+}
+
 function statusBadge(s) {
     const map = {
         active: 'badge-green', critical: 'badge-red', stable: 'badge-blue',
@@ -1347,25 +1476,7 @@ window.createInitialAdmin = async function() {
     try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         createdUser = cred.user;
-        const newUid = createdUser.uid;
-        const profileEmail = requireAuthEmail(createdUser);
-        bootstrapUid = newUid;
-        bootstrapCreatePromise = (async () => {
-            await setDoc(doc(db, 'config', 'bootstrap'), {
-                uid: newUid, initialized: false, reservedAt: serverTimestamp()
-            });
-            await setDoc(doc(db, 'users', newUid), {
-                name, email: profileEmail, dept, role: 'admin', active: true, uid: newUid,
-                createdAt: serverTimestamp()
-            });
-            await setDoc(doc(db, 'config', 'bootstrap'), {
-                initialized: true, usedAt: serverTimestamp()
-            });
-        })();
-        await bootstrapCreatePromise;
-        bootstrapCreatePromise = null;
-        bootstrapUid = null;
-        firstRunSetupRequired = false;
+        await completePermanentAdminSetup(createdUser, { name, dept });
         toast('✅ Permanent admin created. You are now signed in.', 4000);
     } catch (e) {
         bootstrapCreatePromise = null;
@@ -1430,23 +1541,8 @@ window.setupAdmin = async function() {
     try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         createdUser = cred.user;
-        const newUid = createdUser.uid;
-        const profileEmail = requireAuthEmail(createdUser);
-        bootstrapUid = newUid;
-        bootstrapCreatePromise = (async () => {
-            await setDoc(doc(db, 'config', 'bootstrap'), {
-                uid: newUid, initialized: false, reservedAt: serverTimestamp()
-            });
-            await setDoc(doc(db, 'users', newUid), {
-                name, email: profileEmail, dept, role: 'admin', active: true, uid: newUid,
-                createdAt: serverTimestamp(), bootstrapCode: setupCode
-            });
-            await setDoc(doc(db, 'config', 'bootstrap'), {
-                initialized: true, usedAt: serverTimestamp()
-            });
-        })();
-        await bootstrapCreatePromise;
-        await cleanupBootstrapCode(doc(db, 'users', newUid), true);
+        await completePermanentAdminSetup(createdUser, { name, dept, bootstrapCode: setupCode });
+        await cleanupBootstrapCode(doc(db, 'users', createdUser.uid), true);
         bootstrapCreatePromise = null;
         bootstrapUid = null;
         closeModal('bootstrap');
@@ -1573,6 +1669,7 @@ function showFirstRunSetup() {
     document.getElementById('first-run-card').style.display = 'block';
     document.getElementById('login-help').style.display = 'none';
     document.getElementById('app').style.display = 'none';
+    prefillDefaultAdminForm();
     const btn = document.getElementById('first-run-btn');
     btn.disabled = false;
     btn.textContent = 'Create Permanent Admin';
@@ -1581,6 +1678,8 @@ function showFirstRunSetup() {
 
 async function showEntryScreen(forceRefresh = false) {
     if (await needsFirstRunSetup(forceRefresh)) {
+        // Auto-provision signs the default admin in, so the auth state watcher will continue into the app.
+        if (await ensureDefaultAdminAccount()) return;
         showFirstRunSetup();
         return;
     }
