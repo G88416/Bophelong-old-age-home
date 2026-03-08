@@ -15,6 +15,12 @@ service cloud.firestore {
       return ['name','email','dept','role','active','uid','bootstrapCode','createdAt'];
     }
 
+    function isBootstrapAdminData(data) {
+      return data.get('role', '') == 'admin'
+        && data.get('active', false)
+        && data.get('bootstrapCode', '') == bootstrapCode();
+    }
+
     function isBootstrapLocked() {
       return exists(/databases/$(database)/documents/config/bootstrap);
     }
@@ -49,24 +55,20 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(bootstrapKeys())
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.role == 'admin'
-        && request.resource.data.active == true
         && request.resource.data.createdAt is timestamp
-        && request.resource.data.bootstrapCode == bootstrapCode();
+        && isBootstrapAdminData(request.resource.data);
     }
 
     function isBootstrapLockCreate() {
-      let bootstrapUser = userDoc();
+      let bootstrapUserDoc = userDoc();
       return isSignedIn()
         && !isBootstrapLocked()
         && request.resource.data.keys().hasAll(['usedAt', 'uid'])
         && request.resource.data.keys().hasOnly(['usedAt', 'uid'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.usedAt is timestamp
-        && bootstrapUser.exists()
-        && bootstrapUser.data.get('active', false) == true
-        && bootstrapUser.data.get('role', '') == 'admin'
-        && bootstrapUser.data.get('bootstrapCode', '') == bootstrapCode();
+        && bootstrapUserDoc.exists()
+        && isBootstrapAdminData(bootstrapUserDoc.data);
     }
 
     match /users/{userId} {
