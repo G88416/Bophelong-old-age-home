@@ -21,6 +21,11 @@ service cloud.firestore {
         && data.get('bootstrapCode', '') == bootstrapCode();
     }
 
+    function isPermanentAdminData(data) {
+      return data.get('role', '') == 'admin'
+        && data.get('active', false);
+    }
+
     function isBootstrapLocked() {
       return exists(/databases/$(database)/documents/config/bootstrap);
     }
@@ -59,27 +64,46 @@ service cloud.firestore {
         && isBootstrapAdminData(request.resource.data);
     }
 
+    function isInitialAdminCreate(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && !isBootstrapLocked()
+        && request.resource.data.keys().hasAll(['name','email','dept','role','active','uid','createdAt'])
+        && request.resource.data.keys().hasOnly(['name','email','dept','role','active','uid','createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt is timestamp
+        && isPermanentAdminData(request.resource.data);
+    }
+
+    function isBootstrapLockDoc(data) {
+      return data.keys().hasAll(['initialized', 'usedAt'])
+        && data.keys().hasOnly(['initialized', 'usedAt'])
+        && data.get('initialized', false) == true
+        && data.get('usedAt', null) is timestamp;
+    }
+
     function isBootstrapLockCreate() {
       let bootstrapUserDoc = userDoc();
       return isSignedIn()
         && !isBootstrapLocked()
-        && request.resource.data.keys().hasAll(['usedAt', 'uid'])
-        && request.resource.data.keys().hasOnly(['usedAt', 'uid'])
-        && request.resource.data.uid == request.auth.uid
-        && request.resource.data.usedAt is timestamp
+        && isBootstrapLockDoc(request.resource.data)
         && bootstrapUserDoc.exists()
         && isBootstrapAdminData(bootstrapUserDoc.data);
     }
 
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isAdmin() || isBootstrapAdminCreate(userId);
+      allow create: if isAdmin() || isBootstrapAdminCreate(userId) || isInitialAdminCreate(userId);
       allow update, delete: if isAdmin();
     }
 
     match /config/bootstrap {
-      allow read: if isAdmin();
-      allow create: if (isAdmin() && !isBootstrapLocked()) || isBootstrapLockCreate();
+      allow get: if true;
+      allow list: if false;
+      allow create: if !isBootstrapLocked()
+        && isBootstrapLockDoc(request.resource.data)
+        && (isAdmin() || isBootstrapLockCreate());
       allow update, delete: if false;
     }
 

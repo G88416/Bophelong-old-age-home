@@ -8,25 +8,16 @@ credentials stored in this repository.**
 2. Enter the email address and password provided by your administrator.
 3. Click **Sign In**.
 
-## First-time admin setup (temporary login)
-If no admin accounts exist yet, use the **Create demo admin account** button on the login screen.
+## First-time admin setup
+If no admin account exists yet, the app opens on a **Create Your Permanent Admin Account** screen.
 
-This build ships with a temporary setup code already configured so the bootstrap flow works out of
-the box. Anyone with access to the HTML source can see that code, so rotate it immediately after
-setup and only use this flow in a trusted environment.
-1. Open **Create demo admin account**.
-2. Enter your name, email address, password, and the temporary setup code configured for this build.
-3. Create the temporary admin and sign in.
-4. Create your permanent admin from **Staff & Users**.
-5. Change `BOOTSTRAP_CODE` in `index.html`, update `bootstrapCode()` in `firestore.rules` to match,
-   and deploy the rules (`firebase deploy --only firestore:rules`).
+1. Enter your name, email address, department, and password.
+2. Submit the form to create the permanent admin account.
+3. The app signs you in automatically and locks first-time setup.
 
-The app stores a one-time lock in `config/bootstrap` so additional bootstrap admins
-cannot be created. The temporary bootstrap admin is allowed to write that lock during
-first-time setup, but only when its profile still carries the matching bootstrap code.
-After you create your permanent admin, change the bootstrap code
-again (or remove the setup path) and redeploy the rules. If you ever need to rerun
-setup, delete `config/bootstrap` in the Firebase console and deploy with a new code.
+The app stores a one-time lock in `config/bootstrap` so the first-run admin form is only available
+until the first permanent admin is created. If you ever need to rerun setup, delete
+`config/bootstrap` in the Firebase console and deploy the updated Firestore rules if needed.
 
 ## Need an account?
 Ask an administrator to create a user account from the **Staff & Users** section
