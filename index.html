@@ -1601,10 +1601,13 @@ async function needsFirstRunSetup(forceRefresh = false) {
     if (!forceRefresh && firstRunSetupRequired !== null) return firstRunSetupRequired;
     try {
         const snap = await getDoc(doc(db, 'config', 'bootstrap'));
-        firstRunSetupRequired = !snap.exists() || snap.data().initialized !== true;
+        const data = snap.exists() ? snap.data() : null;
+        // Only an explicit initialized === true means bootstrap finished; missing or malformed state should return to setup.
+        firstRunSetupRequired = !data || data.initialized !== true;
     } catch (e) {
         console.warn('Unable to determine first-run setup state:', e);
-        firstRunSetupRequired = e && e.code === 'permission-denied';
+        // A permission-denied read here means config/bootstrap exists but is still in the private, unfinished reservation state.
+        firstRunSetupRequired = e?.code === 'permission-denied';
     }
     return firstRunSetupRequired;
 }
