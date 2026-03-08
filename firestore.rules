@@ -55,6 +55,21 @@ service cloud.firestore {
         && request.resource.data.bootstrapCode == bootstrapCode();
     }
 
+    function isBootstrapLockCreate() {
+      let bootstrapUser = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isSignedIn()
+        && !isBootstrapLocked()
+        && request.resource.data.keys().hasAll(['usedAt', 'uid'])
+        && request.resource.data.keys().hasOnly(['usedAt', 'uid'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.usedAt is timestamp
+        && bootstrapUser.exists()
+        && bootstrapUser.data.get('active', false) == true
+        && bootstrapUser.data.get('role', '') == 'admin'
+        && bootstrapUser.data.get('uid', '') == request.auth.uid
+        && bootstrapUser.data.get('bootstrapCode', '') == bootstrapCode();
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isAdmin() || isBootstrapAdminCreate(userId);
@@ -63,7 +78,7 @@ service cloud.firestore {
 
     match /config/bootstrap {
       allow read: if isAdmin();
-      allow create: if isAdmin() && !isBootstrapLocked();
+      allow create: if (isAdmin() && !isBootstrapLocked()) || isBootstrapLockCreate();
       allow update, delete: if false;
     }
 
