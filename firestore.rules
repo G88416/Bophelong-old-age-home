@@ -23,7 +23,7 @@ service cloud.firestore {
     function isActiveUser() {
       return isSignedIn()
         && userDoc().exists()
-        && userDoc().data.get('active', true);
+        && userDoc().data.get('active', false);
     }
 
     function hasRole(role) {
@@ -50,7 +50,7 @@ service cloud.firestore {
           || resource.data.get('uid', '') == request.auth.uid
           || resource.data.get('email', '') == authEmail()
         )
-        && resource.data.get('active', true);
+        && resource.data.get('active', false);
     }
 
     function isValidRole(role) {
@@ -63,11 +63,11 @@ service cloud.firestore {
         && data.name.size() > 0
         && data.email is string
         && data.email.size() > 0
-        && (!data.keys().hasAny(['dept']) || data.dept is string)
+        && (!data.keys().hasAll(['dept']) || data.dept is string)
         && data.active is bool
         && isValidRole(data.role)
         && data.uid == userId
-        && (!data.keys().hasAny(['createdAt']) || data.createdAt is timestamp);
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp);
     }
 
     function hasStaffUid(data) {
@@ -78,6 +78,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasAll(['msg', 'date', 'uid'])
         && request.resource.data.msg is string
         && request.resource.data.msg.size() > 0
+        && request.resource.data.msg.size() <= 1000
         && request.resource.data.date is timestamp
         && request.resource.data.uid == request.auth.uid;
     }

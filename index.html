@@ -1129,7 +1129,7 @@ function normalizeEmail(value) {
 }
 
 function isUserActive(profile) {
-    return !!profile && profile.active !== false;
+    return !!profile && profile.active === true;
 }
 
 function requireAuthEmail(user) {
@@ -1541,20 +1541,22 @@ function updateClock() {
 async function loadDashboardStats() {
     try {
         const role = currentProfile.role;
-        const queries = [
+        const baseQueries = [
             getDocs(collection(db, 'residents')),
             getDocs(collection(db, 'tasks')),
             role === 'admin'
                 ? getDocs(collection(db, 'leaves'))
                 : getDocs(query(collection(db, 'leaves'), where('staffUid', '==', currentUser.uid))),
         ];
+        const [rSnap, tSnap, lSnap] = await Promise.all(baseQueries);
+        let uSnap = null;
+        let dSnap = null;
         if (role === 'admin') {
-            queries.push(
+            [uSnap, dSnap] = await Promise.all([
                 getDocs(collection(db, 'users')),
                 getDocs(collection(db, 'donations')),
-            );
+            ]);
         }
-        const [rSnap, tSnap, lSnap, uSnap, dSnap] = await Promise.all(queries);
 
         const criticalCount   = rSnap.docs.filter(d => d.data().status === 'critical').length;
         const stableCount     = rSnap.docs.filter(d => d.data().status === 'stable').length;
