@@ -22,7 +22,9 @@ setup and only use this flow in a trusted environment.
    and deploy the rules (`firebase deploy --only firestore:rules`).
 
 The app stores a one-time lock in `config/bootstrap` so additional bootstrap admins
-cannot be created. After you create your permanent admin, change the bootstrap code
+cannot be created. The temporary bootstrap admin is allowed to write that lock during
+first-time setup, but only when its profile still carries the matching bootstrap code.
+After you create your permanent admin, change the bootstrap code
 again (or remove the setup path) and redeploy the rules. If you ever need to rerun
 setup, delete `config/bootstrap` in the Firebase console and deploy with a new code.
 
