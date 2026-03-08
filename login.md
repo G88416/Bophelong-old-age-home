@@ -2,26 +2,10 @@
 
 This portal uses Firebase email/password authentication.
 
-## Default admin credentials
-- **Email:** `admin@admin.local`
-- **Password:** `admin@123`
-- **Important:** Change this password immediately after the first successful sign-in. This app does not include an in-app password change screen, so rotate it in Firebase Authentication.
-
 ## How to sign in
 1. Open `index.html` in a browser (or the deployed site).
-2. Enter the default admin credentials above, or the email address and password provided by your administrator.
+2. Enter the email address and password provided by your administrator.
 3. Click **Sign In**.
-
-## First-time admin setup
-If no admin account exists yet, the app opens on a **Create Your Permanent Admin Account** screen.
-
-1. On a fresh setup, the app attempts to create the default admin account automatically.
-2. If the first-run form appears, it is prefilled with the same default credentials.
-3. The app signs you in automatically and locks first-time setup.
-
-The app stores a one-time lock in `config/bootstrap` so the first-run admin form is only available
-until the first permanent admin is created. If you ever need to rerun setup, delete
-`config/bootstrap` in the Firebase console and deploy the updated Firestore rules if needed.
 
 ## Need an account?
 Ask an administrator to create a user account from the **Staff & Users** section
