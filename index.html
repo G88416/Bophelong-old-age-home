@@ -1051,7 +1051,7 @@ import { initializeApp, getApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence }
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, fetchSignInMethodsForEmail }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
     getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc,
@@ -1079,13 +1079,27 @@ const db   = getFirestore(app);
 // ── TEMPORARY DEV AUTO-LOGIN ──────────────────────────────────────
 const isDevHost = window.location.hostname === 'localhost'
     || window.location.hostname === '127.0.0.1';
-const devAdminEmail = 'admin@bophelong.local';
-const devAdminPassword = '12345678';
+const devAdminEmail = 'admin@bophelong.test';
+const devAdminPassword = 'Boph3long-Dev-Only-2026!';
 let devAutoLoginAttempted = false;
 
 async function maybeRunDevAutoLogin() {
     if (!isDevHost || devAutoLoginAttempted || auth.currentUser) return false;
     devAutoLoginAttempted = true;
+
+    async function createDevAdmin() {
+        console.warn('Dev admin user not found. Creating...');
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, devAdminEmail, devAdminPassword);
+            console.log('🔧 Dev admin created & logged in →', userCredential.user.email);
+            console.warn('Create a matching Firestore profile document for this local dev account if you need app access.');
+            return true;
+        } catch (createErr) {
+            console.error('Dev auto-create failed', createErr);
+        }
+
+        return false;
+    }
 
     try {
         const userCredential = await signInWithEmailAndPassword(auth, devAdminEmail, devAdminPassword);
@@ -1093,14 +1107,17 @@ async function maybeRunDevAutoLogin() {
         return true;
     } catch (error) {
         if (error.code === 'auth/user-not-found') {
-            console.warn('Dev admin user not found. Creating...');
+            return createDevAdmin();
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-login-credentials') {
             try {
-                const userCredential = await createUserWithEmailAndPassword(auth, devAdminEmail, devAdminPassword);
-                console.log('🔧 Dev admin created & logged in →', userCredential.user.email);
-                console.warn('Create a matching Firestore users profile for this local dev account if you need app access.');
-                return true;
-            } catch (createErr) {
-                console.error('Dev auto-create failed', createErr);
+                const signInMethods = await fetchSignInMethodsForEmail(auth, devAdminEmail);
+                if (!signInMethods.length) {
+                    return createDevAdmin();
+                } else {
+                    console.error('Dev auto-login failed; the configured dev password is incorrect for the existing dev admin account.', error);
+                }
+            } catch (lookupErr) {
+                console.warn('Could not verify whether the dev admin already exists before auto-creating.', lookupErr);
             }
         } else {
             console.error('Dev auto-login failed', error);
