@@ -109,6 +109,7 @@
             justify-content: center;
             margin-top: 12px;
         }
+        .login-alt-btn[hidden] { display: none !important; }
 
         /* ═══════════════════════════════════════════════════════
            APP SHELL  (hidden until logged in)
@@ -566,6 +567,7 @@
             </div>
             <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In</button>
             <div class="login-msg" id="login-msg"></div>
+            <button class="btn btn-ghost login-alt-btn" id="login-retry-btn" onclick="retryProfileAccess()" hidden>Retry access</button>
         </div>
         <p class="login-help" id="login-help">Sign in with the email address and password provided by your administrator.</p>
     </div>
@@ -1051,7 +1053,7 @@ import { initializeApp, getApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, fetchSignInMethodsForEmail }
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, fetchSignInMethodsForEmail, deleteUser }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
     getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc,
@@ -1132,6 +1134,7 @@ let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
+const PROFILE_LOAD_RETRY_DELAY_MS = 300;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1203,10 +1206,61 @@ function createProfileAccessError(code) {
 }
 
 function getProfileAccessErrorMessage(error) {
-    const code = error && error.code;
+    const code = normalizeFirebaseErrorCode(error && error.code);
     if (code === 'inactive') return 'Your account is inactive. Contact your administrator.';
     if (code === 'no-profile') return 'Profile not found. Contact your administrator.';
+    if (!navigator.onLine) return 'You are offline. Reconnect to the internet and retry.';
+    if (code === 'unavailable' || code === 'deadline-exceeded') return 'We could not reach the server. Please retry in a moment.';
+    if (code === 'permission-denied') return 'Your sign-in succeeded, but your profile could not be opened right now. Please retry or contact your administrator.';
     return 'Unable to access your profile. Contact your administrator.';
+}
+
+function normalizeFirebaseErrorCode(code) {
+    return String(code || '').replace(/^[^/]+\//, '');
+}
+
+function isPermanentProfileAccessError(error) {
+    const code = normalizeFirebaseErrorCode(error && error.code);
+    return code === 'inactive' || code === 'no-profile';
+}
+
+function isRetryableProfileAccessError(error) {
+    if (!error || isPermanentProfileAccessError(error)) return false;
+    if (!navigator.onLine) return true;
+    const code = normalizeFirebaseErrorCode(error.code);
+    return code === 'unavailable'
+        || code === 'deadline-exceeded'
+        || code === 'aborted'
+        || code === 'resource-exhausted';
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function setLoginMessage(message, tone = 'error') {
+    const msgEl = document.getElementById('login-msg');
+    msgEl.textContent = message || '';
+    msgEl.className = message ? `login-msg ${tone}` : 'login-msg';
+}
+
+function setLoginRetryVisible(visible) {
+    document.getElementById('login-retry-btn').hidden = !visible;
+}
+
+async function finishProfileAccessFailure(error) {
+    currentProfile = null;
+    showLogin();
+    if (isPermanentProfileAccessError(error)) {
+        await signOut(auth);
+        setLoginRetryVisible(false);
+        setLoginMessage(getProfileAccessErrorMessage(error), 'error');
+        return false;
+    }
+
+    setLoginRetryVisible(true);
+    setLoginMessage(getProfileAccessErrorMessage(error), 'info');
+    return false;
 }
 
 function statusBadge(s) {
@@ -1230,17 +1284,16 @@ window.doLogin = async function() {
     const email = normalizeEmail(document.getElementById('l-email').value);
     const pass  = document.getElementById('l-password').value;
     const btn   = document.getElementById('login-btn');
-    const msgEl = document.getElementById('login-msg');
 
     if (!email || !pass) {
-        msgEl.textContent = 'Please enter your email and password.';
-        msgEl.className = 'login-msg error';
+        setLoginMessage('Please enter your email and password.', 'error');
         return;
     }
 
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Signing in…';
-    msgEl.className = 'login-msg';
+    setLoginRetryVisible(false);
+    setLoginMessage('');
 
     try {
         await authPersistenceSettled;
@@ -1256,8 +1309,7 @@ window.doLogin = async function() {
             'auth/too-many-requests':'Too many attempts. Please wait and try again.',
             'auth/invalid-credential': 'Invalid email or password.'
         };
-        msgEl.textContent = msgs[e.code] || 'Sign-in failed: ' + e.message;
-        msgEl.className = 'login-msg error';
+        setLoginMessage(msgs[e.code] || 'Sign-in failed: ' + e.message, 'error');
     }
 };
 
@@ -1280,6 +1332,8 @@ authPersistenceSettled.finally(() => {
             if (await maybeRunDevAutoLogin()) return;
             currentUser    = null;
             currentProfile = null;
+            setLoginMessage('');
+            setLoginRetryVisible(false);
             showLogin();
             return;
         }
@@ -1288,10 +1342,7 @@ authPersistenceSettled.finally(() => {
             await loadProfile(user);
             showApp();
         } catch (e) {
-            await signOut(auth);
-            const msgEl = document.getElementById('login-msg');
-            msgEl.textContent = getProfileAccessErrorMessage(e);
-            msgEl.className = 'login-msg error';
+            await finishProfileAccessFailure(e);
         }
     });
 });
@@ -1299,29 +1350,69 @@ authPersistenceSettled.finally(() => {
 async function loadProfile(user) {
     const rawAuthEmail = String((user && user.email) || '').trim();
     const normalizedAuthEmail = requireAuthEmail(user);
-    // Try UID-keyed doc first
-    let snap = await getDoc(doc(db, 'users', user.uid));
-    if (!snap.exists()) {
-        // Fallback: find by stored UID or email (legacy data)
-        const usersRef = collection(db, 'users');
-        const normalizedEmail = normalizedAuthEmail;
-        // Some legacy profiles stored the Firebase UID in a field but used a different document ID.
-        let qs = await getDocs(query(usersRef, where('uid', '==', user.uid)));
-        if (qs.empty) {
-            qs = rawAuthEmail ? await getDocs(query(usersRef, where('email', '==', rawAuthEmail))) : { empty: true };
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            // Try UID-keyed doc first
+            let snap = await getDoc(doc(db, 'users', user.uid));
+            if (!snap.exists()) {
+                // Fallback: find by stored UID or email (legacy data)
+                const usersRef = collection(db, 'users');
+                const normalizedEmail = normalizedAuthEmail;
+                // Some legacy profiles stored the Firebase UID in a field but used a different document ID.
+                let qs = await getDocs(query(usersRef, where('uid', '==', user.uid)));
+                if (qs.empty) {
+                    qs = rawAuthEmail ? await getDocs(query(usersRef, where('email', '==', rawAuthEmail))) : { empty: true };
+                }
+                if (qs.empty && rawAuthEmail !== normalizedEmail) {
+                    qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
+                }
+                if (qs.empty) {
+                    throw createProfileAccessError('no-profile');
+                }
+                snap = qs.docs[0];
+            }
+            const data = snap.data();
+            if (!isUserActive(data)) throw createProfileAccessError('inactive');
+            currentProfile = data;
+            return data;
+        } catch (error) {
+            if (!isRetryableProfileAccessError(error) || attempt === 2) {
+                throw error;
+            }
+            await delay(PROFILE_LOAD_RETRY_DELAY_MS * Math.pow(2, attempt));
         }
-        if (qs.empty && rawAuthEmail !== normalizedEmail) {
-            qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
-        }
-        if (qs.empty) {
-            throw createProfileAccessError('no-profile');
-        }
-        snap = qs.docs[0];
     }
-    const data = snap.data();
-    if (!isUserActive(data)) throw createProfileAccessError('inactive');
-    currentProfile = data;
 }
+
+window.retryProfileAccess = async function() {
+    const retryBtn = document.getElementById('login-retry-btn');
+    if (!auth.currentUser) {
+        setLoginRetryVisible(false);
+        return;
+    }
+    retryBtn.disabled = true;
+    retryBtn.textContent = 'Retrying…';
+    setLoginMessage('');
+    try {
+        await loadProfile(auth.currentUser);
+        currentUser = auth.currentUser;
+        setLoginRetryVisible(false);
+        showApp();
+    } catch (error) {
+        await finishProfileAccessFailure(error);
+    } finally {
+        retryBtn.disabled = false;
+        retryBtn.textContent = 'Retry access';
+    }
+};
+
+window.__profileRetryOnlineListener = window.__profileRetryOnlineListener || (() => {
+    if (auth.currentUser && !currentProfile) {
+        window.retryProfileAccess();
+    }
+});
+window.removeEventListener('online', window.__profileRetryOnlineListener);
+window.addEventListener('online', window.__profileRetryOnlineListener);
 
 // ── Show / hide screens ──────────────────────────────────────────────
 function showLogin() {
@@ -1332,6 +1423,7 @@ function showLogin() {
     const btn = document.getElementById('login-btn');
     btn.disabled = false;
     btn.textContent = 'Sign In';
+    setLoginRetryVisible(false);
     resetOrbMenuState();
 }
 
@@ -2216,16 +2308,27 @@ window.saveUser = async function() {
 
         const secondaryAuth = getAuth(secondaryApp);
         const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-        const newUid = cred.user.uid;
-        const profileEmail = requireAuthEmail(cred.user);
-        await signOut(secondaryAuth);
+        const createdUser = cred.user;
+        const newUid = createdUser.uid;
+        const profileEmail = requireAuthEmail(createdUser);
 
-        // Store the Firestore profile keyed by the new UID (consistent with loadProfile)
-        await setDoc(doc(db, 'users', newUid), {
-            name, email: profileEmail, dept, role, active: true, uid: newUid, createdAt: serverTimestamp()
-        });
+        try {
+            // Store the Firestore profile keyed by the new UID (consistent with loadProfile)
+            await setDoc(doc(db, 'users', newUid), {
+                name, email: profileEmail, dept, role, active: true, uid: newUid, createdAt: serverTimestamp()
+            });
 
-        await logActivity(`Admin created new user: ${name} (${role})`);
+            await logActivity(`Admin created new user: ${name} (${role})`);
+        } catch (profileError) {
+            try {
+                await deleteUser(createdUser);
+            } catch (deleteError) {
+                console.error('User profile creation failed and the new auth account could not be rolled back automatically.', deleteError);
+            }
+            throw profileError;
+        } finally {
+            await signOut(secondaryAuth);
+        }
 
         closeModal('user');
         toast(`✅ ${name} created successfully. They can now sign in.`, 4000);
