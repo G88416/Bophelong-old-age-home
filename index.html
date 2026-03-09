@@ -1211,7 +1211,7 @@ function deriveProfileName(user, profile) {
 
 function buildSessionProfile(user, profile = null) {
     const storedProfile = profile && typeof profile === 'object' ? profile : {};
-    const storedRole = isUserActive(storedProfile)
+    const storedRole = profile && isUserActive(storedProfile)
         ? normalizeUserRole(storedProfile.role)
         : 'staff';
     return {
@@ -1236,12 +1236,8 @@ function normalizeFirebaseErrorCode(code) {
     return String(code || '').replace(/^[^/]+\//, '');
 }
 
-function isPermanentProfileAccessError(error) {
-    return false;
-}
-
 function isRetryableProfileAccessError(error) {
-    if (!error || isPermanentProfileAccessError(error)) return false;
+    if (!error) return false;
     if (!navigator.onLine) return true;
     const code = normalizeFirebaseErrorCode(error.code);
     return code === 'unavailable'
@@ -1267,13 +1263,6 @@ function setLoginRetryVisible(visible) {
 async function finishProfileAccessFailure(error) {
     currentProfile = null;
     showLogin();
-    if (isPermanentProfileAccessError(error)) {
-        await signOut(auth);
-        setLoginRetryVisible(false);
-        setLoginMessage(getProfileAccessErrorMessage(error), 'error');
-        return false;
-    }
-
     setLoginRetryVisible(true);
     setLoginMessage(getProfileAccessErrorMessage(error), 'info');
     return false;
