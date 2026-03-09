@@ -382,6 +382,32 @@
         }
         .search-bar .result-count { font-size: .78rem; color: var(--muted); white-space: nowrap; }
 
+        /* ── Admin workspace ─────────────────────────────────────── */
+        .admin-grid {
+            display: grid; grid-template-columns: 1.15fr .85fr; gap: 20px; margin-bottom: 20px;
+        }
+        .admin-list {
+            display: grid; gap: 12px;
+        }
+        .admin-list-item {
+            padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+        }
+        .admin-list-item strong {
+            display: block; font-size: .82rem; color: var(--dark); margin-bottom: 3px;
+        }
+        .admin-list-item span {
+            display: block; font-size: .8rem; color: var(--muted); line-height: 1.45;
+        }
+        .inline-actions, .table-actions {
+            display: flex; flex-wrap: wrap; gap: 8px;
+        }
+        .field-help {
+            display: block; margin-top: 6px; font-size: .74rem; color: var(--muted); line-height: 1.45;
+        }
+        @media (max-width: 900px) {
+            .admin-grid { grid-template-columns: 1fr; }
+        }
+
         /* ── Password toggle ─────────────────────────────────────── */
         .pw-wrap { position: relative; }
         .pw-wrap input { padding-right: 40px; }
@@ -666,9 +692,62 @@
 
             <!-- USERS -->
             <div class="section" id="sec-users">
+                <div class="stats-grid" id="admin-user-stats">
+                    <div class="stat-card purple" aria-label="Managed Users statistics">
+                        <div class="label">👥 Managed Users</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading user management metrics…</div>
+                    </div>
+                    <div class="stat-card cyan" aria-label="Admins on Duty statistics">
+                        <div class="label">🛡️ Admins on Duty</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading role coverage…</div>
+                    </div>
+                    <div class="stat-card amber" aria-label="Needs Attention statistics">
+                        <div class="label">⚠️ Needs Attention</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading access health…</div>
+                    </div>
+                    <div class="stat-card green" aria-label="Departments statistics">
+                        <div class="label">🏢 Departments</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading team structure…</div>
+                    </div>
+                </div>
+                <div class="admin-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🛠️ Admin Workspace</h3>
+                            <button class="btn btn-ghost btn-sm" onclick="loadUsers(); loadDashboardStats();">↻ Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">Provision accounts, assign roles, and keep staff access aligned with Firebase Authentication from one workspace.</div>
+                            <div class="admin-list" id="admin-resource-list">
+                                <div class="admin-list-item">
+                                    <strong>Preparing admin resources…</strong>
+                                    <span>Loading access guidance and onboarding insights.</span>
+                                </div>
+                            </div>
+                            <div class="inline-actions" style="margin-top:16px;">
+                                <button class="btn btn-primary btn-sm" onclick="openModal('user')">+ Add User</button>
+                                <button class="btn btn-ghost btn-sm" onclick="navigateTo('activities')">📜 View Audit Log</button>
+                                <button class="btn btn-ghost btn-sm" onclick="loadUsers()">🔄 Refresh Directory</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>🔐 User Provisioning</h3></div>
+                        <div class="card-body" id="user-provisioning-summary">
+                            <div class="empty">
+                                <div class="e-icon">🔐</div>
+                                <p>Loading Firebase Authentication provisioning summary…</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="card">
                     <div class="card-header">
-                        <h3>👥 Staff & Users</h3>
+                        <h3>👥 Team Directory</h3>
                         <button class="btn btn-primary btn-sm" onclick="openModal('user')">+ Add User</button>
                     </div>
                     <div class="search-bar">
@@ -678,6 +757,11 @@
                             <option value="admin">Admin</option>
                             <option value="staff">Staff</option>
                             <option value="doctor">Doctor</option>
+                        </select>
+                        <select id="user-status-filter" onchange="filterUsers()">
+                            <option value="">All Statuses</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
                         </select>
                         <span class="result-count" id="user-count"></span>
                     </div>
@@ -867,9 +951,14 @@
 <!-- User modal -->
 <div class="modal-overlay" id="modal-user" hidden>
     <div class="modal">
-        <h3>👤 Add Staff / User</h3>
+        <h3 id="user-modal-title">👤 Add Staff / User</h3>
+        <div class="alert alert-info" id="user-auth-note">Create a Firebase Authentication login and matching staff profile so the user can sign in immediately.</div>
         <div class="form-group"><label>Full Name *</label><input id="u-name" placeholder="Full name"></div>
-        <div class="form-group"><label>Email Address *</label><input id="u-email" type="email" placeholder="user@example.com"></div>
+        <div class="form-group">
+            <label>Email Address *</label>
+            <input id="u-email" type="email" placeholder="user@example.com">
+            <span class="field-help" id="u-email-help">This email is used for the Firebase Authentication sign-in.</span>
+        </div>
         <div class="form-group"><label>Department</label><input id="u-dept" placeholder="e.g. Caregiving Ward"></div>
         <div class="form-group">
             <label>Role</label>
@@ -879,18 +968,20 @@
                 <option value="admin">Admin</option>
             </select>
         </div>
-        <div class="form-group">
-            <label>Password *</label>
-            <div class="pw-wrap">
-                <input id="u-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password">
-                <button type="button" class="pw-toggle" onclick="togglePw('u-password',this)" title="Show/hide password" aria-label="Show password">👁</button>
+        <div id="user-password-fields">
+            <div class="form-group">
+                <label>Password *</label>
+                <div class="pw-wrap">
+                    <input id="u-password" type="password" placeholder="Min. 8 characters" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" onclick="togglePw('u-password',this)" title="Show/hide password" aria-label="Show password">👁</button>
+                </div>
             </div>
-        </div>
-        <div class="form-group">
-            <label>Confirm Password *</label>
-            <div class="pw-wrap">
-                <input id="u-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
-                <button type="button" class="pw-toggle" onclick="togglePw('u-confirm',this)" title="Show/hide password" aria-label="Show password">👁</button>
+            <div class="form-group">
+                <label>Confirm Password *</label>
+                <div class="pw-wrap">
+                    <input id="u-confirm" type="password" placeholder="Repeat password" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" onclick="togglePw('u-confirm',this)" title="Show/hide password" aria-label="Show password">👁</button>
+                </div>
             </div>
         </div>
         <div class="modal-msg" id="modal-user-msg"></div>
@@ -1134,6 +1225,7 @@ let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
+let editingUserId  = null;
 const PROFILE_LOAD_RETRY_DELAY_MS = 300;
 const VALID_USER_ROLES = new Set(['admin', 'staff', 'doctor']);
 
@@ -1186,8 +1278,26 @@ function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function escapeHTML(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function isUserActive(profile) {
     return !!profile && profile.active === true;
+}
+
+function timestampToMillis(value) {
+    if (!value) return 0;
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (typeof value.toDate === 'function') return value.toDate().getTime();
+    if (typeof value.seconds === 'number') return value.seconds * 1000;
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function requireAuthEmail(user) {
@@ -1454,7 +1564,7 @@ const NAV_ITEMS = [
     { id: 'tasks',       icon: '✅', label: 'Tasks',             roles: ['admin','staff','doctor'] },
     { id: 'medications', icon: '💊', label: 'Medications',       roles: ['admin','staff','doctor'] },
     { id: 'leaves',      icon: '🗓️', label: 'Leave Requests',    roles: ['admin','staff','doctor'] },
-    { id: 'users',       icon: '👥', label: 'Staff & Users',     roles: ['admin'] },
+    { id: 'users',       icon: '👥', label: 'Admin Workspace',   roles: ['admin'] },
     { id: 'finance',     icon: '💰', label: 'Finance',           roles: ['admin'] },
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
@@ -1675,7 +1785,7 @@ window.navigateTo = function(id) {
     const navEl = document.getElementById('nav-' + id);
     if (navEl) navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Staff & Users',
+    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Admin Workspace',
                      tasks:'Tasks', medications:'Medications', finance:'Finance',
                      leaves:'Leave Requests', activities:'Audit Log' };
     document.getElementById('page-title').textContent = labels[id] || id;
@@ -1950,13 +2060,91 @@ async function loadUsers() {
     }
 }
 
+function renderUserAdminWorkspace(filteredUsers = usersAll) {
+    const statsEl = document.getElementById('admin-user-stats');
+    const resourcesEl = document.getElementById('admin-resource-list');
+    const provisioningEl = document.getElementById('user-provisioning-summary');
+    if (!statsEl || !resourcesEl || !provisioningEl) return;
+
+    const totalUsers = usersAll.length;
+    const activeUsers = usersAll.filter(isUserActive).length;
+    const inactiveUsers = totalUsers - activeUsers;
+    const admins = usersAll.filter(u => u.role === 'admin').length;
+    const doctors = usersAll.filter(u => u.role === 'doctor').length;
+    const staff = usersAll.filter(u => normalizeUserRole(u.role) === 'staff').length;
+    const departments = new Set(usersAll.map(u => String(u.dept || '').trim()).filter(Boolean)).size;
+    const filteredCount = Array.isArray(filteredUsers) ? filteredUsers.length : totalUsers;
+    const latestUsers = [...usersAll]
+        .sort((a, b) => timestampToMillis(b.createdAt) - timestampToMillis(a.createdAt))
+        .slice(0, 3);
+
+    statsEl.innerHTML = [
+        { label: 'Managed Users', value: totalUsers, sub: `${activeUsers} active accounts`, cls: 'purple', icon: '👥' },
+        { label: 'Admins on Duty', value: admins, sub: `${doctors} doctors configured`, cls: 'cyan', icon: '🛡️' },
+        { label: 'Needs Attention', value: inactiveUsers, sub: inactiveUsers ? 'inactive account(s) paused' : 'all accounts active', cls: 'amber', icon: '⚠️' },
+        { label: 'Departments', value: departments || '—', sub: `${staff} staff members assigned`, cls: 'green', icon: '🏢' },
+    ].map(c => `
+        <div class="stat-card ${c.cls}" aria-label="${escapeHTML(`${c.label} statistics`)}}">
+            <div class="label">${c.icon} ${escapeHTML(c.label)}</div>
+            <div class="value">${escapeHTML(c.value)}</div>
+            <div class="sub">${escapeHTML(c.sub)}</div>
+        </div>
+    `).join('');
+
+    resourcesEl.innerHTML = `
+        <div class="admin-list-item">
+            <strong>Onboard safely</strong>
+            <span>Add User provisions a Firebase Authentication account and a matching in-app profile without signing the current admin out.</span>
+        </div>
+        <div class="admin-list-item">
+            <strong>Review access health</strong>
+            <span>${filteredCount !== totalUsers ? `You are viewing ${filteredCount} of ${totalUsers} users after applying filters.` : `All ${totalUsers} managed users are visible in the directory below.`}</span>
+        </div>
+        <div class="admin-list-item">
+            <strong>Track changes</strong>
+            <span>Every create, profile update, activation, and deactivation is logged so admins can confirm who changed access.</span>
+        </div>
+    `;
+
+    if (!totalUsers) {
+        provisioningEl.innerHTML = '<div class="empty"><div class="e-icon">👤</div><p>No staff profiles exist yet. Use “Add User” to create the first Firebase-backed account.</p></div>';
+        return;
+    }
+
+    const latestSummary = latestUsers.length
+        ? escapeHTML(latestUsers.map(u => u.name || u.email || 'Unnamed user').join(', '))
+        : 'No recent additions yet.';
+    provisioningEl.innerHTML = `
+        <div class="admin-list">
+            <div class="admin-list-item">
+                <strong>Firebase Authentication linked</strong>
+                <span>Newly created users receive secure sign-in credentials plus a matching Firestore profile required for app access.</span>
+            </div>
+            <div class="admin-list-item">
+                <strong>Role coverage</strong>
+                <span>${admins} admin, ${doctors} doctor, and ${staff} staff account(s) are currently registered.</span>
+            </div>
+            <div class="admin-list-item">
+                <strong>Access readiness</strong>
+                <span>${activeUsers} active account(s) can sign in now. ${inactiveUsers ? `${inactiveUsers} account(s) are inactive and blocked until re-enabled.` : 'No inactive accounts require follow-up.'}</span>
+            </div>
+            <div class="admin-list-item">
+                <strong>Latest additions</strong>
+                <span>${latestSummary}</span>
+            </div>
+        </div>
+    `;
+}
+
 window.filterUsers = function() {
     const tb     = document.getElementById('users-tbody');
     const search = (document.getElementById('user-search')?.value || '').toLowerCase();
     const roleF  = document.getElementById('user-role-filter')?.value || '';
+    const statusF = document.getElementById('user-status-filter')?.value || '';
     const cntEl  = document.getElementById('user-count');
 
     if (usersAll.length === 0) {
+        renderUserAdminWorkspace([]);
         tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">👥</div><p>No users found.</p></div></td></tr>';
         if (cntEl) cntEl.textContent = '';
         return;
@@ -1968,8 +2156,10 @@ window.filterUsers = function() {
             (u.email || '').toLowerCase().includes(search) ||
             (u.dept  || '').toLowerCase().includes(search);
         const matchRole = !roleF || u.role === roleF;
-        return matchSearch && matchRole;
+        const matchStatus = !statusF || (statusF === 'active' ? isUserActive(u) : !isUserActive(u));
+        return matchSearch && matchRole && matchStatus;
     });
+    renderUserAdminWorkspace(filtered);
 
     if (cntEl) cntEl.textContent = filtered.length !== usersAll.length ? `${filtered.length} of ${usersAll.length}` : `${usersAll.length} users`;
 
@@ -1981,16 +2171,22 @@ window.filterUsers = function() {
     tb.innerHTML = filtered.map(u => {
         const isActive = isUserActive(u);
         const isSelf  = u._docId === currentUser.uid;
-        const actions = !isSelf
-            ? `<button class="btn btn-ghost btn-sm" onclick="toggleUserActive('${u._docId}',${isActive})">${isActive ? '🔒 Deactivate' : '✅ Activate'}</button>`
+        const safeName = escapeHTML(u.name || '—');
+        const safeEmail = escapeHTML(u.email || '—');
+        const safeDept = escapeHTML(u.dept || '—');
+        const safeDocId = escapeHTML(String(u._docId || ''));
+        const userLabel = escapeHTML(u.name || u.email || 'user');
+        const editAction = `<button class="btn btn-ghost btn-sm" data-user-id="${safeDocId}" onclick="editUser(this.dataset.userId)" aria-label="Edit ${userLabel}">✏️ Edit</button>`;
+        const toggleAction = !isSelf
+            ? `<button class="btn btn-ghost btn-sm" data-user-id="${safeDocId}" onclick="toggleUserActive(this.dataset.userId,${isActive})" aria-label="${escapeHTML(`${isActive ? 'Deactivate' : 'Activate'} ${u.name || u.email || 'user'} account`)}">${isActive ? '🔒 Deactivate' : '✅ Activate'}</button>`
             : '<span class="badge badge-purple">you</span>';
         return `<tr>
-            <td><strong>${u.name || '—'}</strong></td>
-            <td>${u.email || '—'}</td>
+            <td><strong>${safeName}</strong></td>
+            <td>${safeEmail}</td>
             <td>${roleBadgeHTML(u.role)}</td>
-            <td>${u.dept || '—'}</td>
+            <td>${safeDept}</td>
             <td>${isActive ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-red">Inactive</span>'}</td>
-            <td>${actions}</td>
+            <td><div class="table-actions">${editAction}${toggleAction}</div></td>
         </tr>`;
     }).join('');
 };
@@ -2003,6 +2199,63 @@ async function toggleUserActive(id, current) {
         loadUsers();
     } catch (e) { toast('Error: ' + e.message); }
 }
+
+function resetUserModalMessage() {
+    const msg = document.getElementById('modal-user-msg');
+    msg.textContent = '';
+    msg.className = 'modal-msg';
+}
+
+function configureUserModal(mode = 'create', user = null) {
+    const isEdit = mode === 'edit' && user;
+    const title = document.getElementById('user-modal-title');
+    const note = document.getElementById('user-auth-note');
+    const email = document.getElementById('u-email');
+    const emailHelp = document.getElementById('u-email-help');
+    const passwordFields = document.getElementById('user-password-fields');
+    const saveBtn = document.getElementById('save-user-btn');
+
+    editingUserId = isEdit ? user._docId : null;
+    document.getElementById('u-name').value = isEdit ? (user.name || '') : '';
+    email.value = isEdit ? (user.email || '') : '';
+    document.getElementById('u-dept').value = isEdit ? (user.dept || '') : '';
+    document.getElementById('u-role').value = isEdit ? normalizeUserRole(user.role) : 'staff';
+    document.getElementById('u-password').value = '';
+    document.getElementById('u-confirm').value = '';
+    document.getElementById('u-password').type = 'password';
+    document.getElementById('u-confirm').type = 'password';
+    document.querySelectorAll('#modal-user .pw-toggle').forEach(btn => {
+        btn.textContent = '👁';
+        btn.setAttribute('aria-label', 'Show password');
+    });
+
+    email.readOnly = !!isEdit;
+    if (isEdit) {
+        title.textContent = '✏️ Edit Staff / User';
+        note.textContent = 'Update the in-app profile for this user. Email and password changes must still be handled directly in Firebase Authentication.';
+        emailHelp.textContent = 'Email is locked here to keep the existing Firebase Authentication login aligned.';
+        passwordFields.hidden = true;
+        saveBtn.textContent = 'Save Changes';
+    } else {
+        title.textContent = '👤 Add Staff / User';
+        note.textContent = 'Create a Firebase Authentication login and matching staff profile so the user can sign in immediately.';
+        emailHelp.textContent = 'This email is used for the Firebase Authentication sign-in.';
+        passwordFields.hidden = false;
+        saveBtn.textContent = 'Create User';
+    }
+
+    resetUserModalMessage();
+}
+
+window.editUser = function(id) {
+    const user = usersAll.find(u => u._docId === id);
+    if (!user) {
+        toast('Unable to find that user profile.');
+        return;
+    }
+    configureUserModal('edit', user);
+    document.getElementById('modal-user').removeAttribute('hidden');
+};
 
 // ── Tasks ─────────────────────────────────────────────────────────────
 async function loadTasks() {
@@ -2240,23 +2493,16 @@ window.openModal  = function(name) {
     document.getElementById('modal-' + name).removeAttribute('hidden');
     // Reset user form fields each time the modal is opened
     if (name === 'user') {
-        ['u-name','u-email','u-dept','u-password','u-confirm'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        document.getElementById('u-role').value = 'staff';
-        // Reset password visibility toggles
-        ['u-password','u-confirm'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.type = 'password';
-        });
-        document.querySelectorAll('.pw-toggle').forEach(b => b.textContent = '👁');
-        document.getElementById('modal-user-msg').className = 'modal-msg';
+        configureUserModal('create');
     }
 };
 window.closeModal = function(name) {
     document.getElementById('modal-' + name).setAttribute('hidden', '');
     document.getElementById('modal-' + name + '-msg').className = 'modal-msg';
+    if (name === 'user') {
+        editingUserId = null;
+        resetUserModalMessage();
+    }
 };
 
 function modalMsg(name, text, type) {
@@ -2288,20 +2534,42 @@ window.saveUser = async function() {
     const name     = document.getElementById('u-name').value.trim();
     const email    = normalizeEmail(document.getElementById('u-email').value);
     const dept     = document.getElementById('u-dept').value.trim();
-    const role     = document.getElementById('u-role').value;
+    const role     = normalizeUserRole(document.getElementById('u-role').value);
     const password = document.getElementById('u-password').value;
     const confirm  = document.getElementById('u-confirm').value;
+    const isEdit   = !!editingUserId;
 
     if (!name || !email) { modalMsg('user', 'Name and email are required.', 'error'); return; }
-    if (!password)        { modalMsg('user', 'A password is required so the user can sign in.', 'error'); return; }
-    if (password.length < 8) { modalMsg('user', 'Password must be at least 8 characters.', 'error'); return; }
-    if (password !== confirm) { modalMsg('user', 'Passwords do not match.', 'error'); return; }
+    if (!isEdit) {
+        if (!password)        { modalMsg('user', 'A password is required so the user can sign in.', 'error'); return; }
+        if (password.length < 8) { modalMsg('user', 'Password must be at least 8 characters.', 'error'); return; }
+        if (password !== confirm) { modalMsg('user', 'Passwords do not match.', 'error'); return; }
+    }
 
     const btn = document.getElementById('save-user-btn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Creating…';
+    btn.innerHTML = `<span class="spinner"></span> ${isEdit ? 'Saving…' : 'Creating…'}`;
 
     try {
+        if (isEdit) {
+            const existing = usersAll.find(u => u._docId === editingUserId);
+            if (!existing) throw new Error('That user profile could not be found.');
+            if (!existing.uid) throw new Error('This user profile is missing its Firebase Authentication UID. Please recreate the user or repair the profile before editing.');
+            await updateDoc(doc(db, 'users', editingUserId), {
+                name,
+                email,
+                dept,
+                role,
+                uid: existing.uid
+            });
+            await logActivity(`Admin updated user profile: ${name} (${role})`);
+            closeModal('user');
+            toast(`✅ ${name} updated successfully.`, 4000);
+            loadUsers();
+            loadDashboardStats();
+            return;
+        }
+
         // Use a secondary Firebase App instance so the current admin session is not disrupted
         let secondaryApp;
         try { secondaryApp = getApp('secondary'); }
@@ -2347,7 +2615,7 @@ window.saveUser = async function() {
         modalMsg('user', msgs[e.code] || 'Error: ' + e.message, 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Create User';
+        btn.textContent = isEdit ? 'Save Changes' : 'Create User';
     }
 };
 
