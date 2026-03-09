@@ -39,8 +39,8 @@ service cloud.firestore {
       return isSignedIn()
         && userId == request.auth.uid
         && authEmail() == 'admin@oldage.com'
-        && data.get('email', '') == authEmail()
-        && data.get('uid', '') == request.auth.uid
+        && data.get('email', null) == authEmail()
+        && data.get('uid', null) == request.auth.uid
         && data.get('role', '') == 'admin'
         && data.get('active', false);
     }
