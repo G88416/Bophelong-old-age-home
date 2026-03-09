@@ -1923,7 +1923,7 @@ function showApp() {
 }
 
 function getDefaultWorkspaceForProfile(profile) {
-    return profile && profile.role === 'admin'
+    return profile && normalizeUserRole(profile.role) === 'admin'
         ? DEFAULT_WORKSPACES.admin
         : DEFAULT_WORKSPACES.fallback;
 }
