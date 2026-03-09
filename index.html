@@ -1339,8 +1339,13 @@ function pickBestProfileMatch(user, docs = []) {
     if (!Array.isArray(docs) || !docs.length) return null;
     const rawAuthEmail = String((user && user.email) || '').trim();
     const normalizedAuthEmail = normalizeEmail(rawAuthEmail);
+    const docMeta = new Map();
     const scoreDoc = snap => {
-        const data = snap && typeof snap.data === 'function' ? snap.data() : {};
+        if (docMeta.has(snap)) return docMeta.get(snap);
+        const snapshotData = snap && typeof snap.data === 'function' ? snap.data() : null;
+        const data = snapshotData && typeof snapshotData === 'object'
+            ? snapshotData
+            : {};
         const normalizedProfileEmail = normalizeEmail(data && data.email);
         let score = 0;
         if (snap && snap.id === user.uid) score += 100;
@@ -1348,13 +1353,17 @@ function pickBestProfileMatch(user, docs = []) {
         if (normalizedProfileEmail && normalizedProfileEmail === normalizedAuthEmail) score += 40;
         if (data && data.email === rawAuthEmail) score += 10;
         if (isUserActive(data)) score += 5;
-        return score;
+        const meta = { score, createdAtMillis: timestampToMillis(data.createdAt) };
+        docMeta.set(snap, meta);
+        return meta;
     };
 
     return [...docs].sort((left, right) => {
-        const scoreDiff = scoreDoc(right) - scoreDoc(left);
+        const rightMeta = scoreDoc(right);
+        const leftMeta = scoreDoc(left);
+        const scoreDiff = rightMeta.score - leftMeta.score;
         if (scoreDiff) return scoreDiff;
-        return timestampToMillis(right.data().createdAt) - timestampToMillis(left.data().createdAt);
+        return rightMeta.createdAtMillis - leftMeta.createdAtMillis;
     })[0];
 }
 
