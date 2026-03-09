@@ -48,6 +48,9 @@ service cloud.firestore {
         && (
           userId == request.auth.uid
           || (
+            // Allow users to read their own profile even when inactive so the app
+            // can show a clear inactive-account message before broader data access
+            // remains blocked by isActiveUser().
             resource != null
             && (
               resource.data.get('uid', '') == request.auth.uid

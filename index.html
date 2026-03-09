@@ -1134,6 +1134,7 @@ let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
+const PROFILE_LOAD_RETRY_DELAY_MS = 300;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1233,7 +1234,7 @@ function isRetryableProfileAccessError(error) {
         || code === 'resource-exhausted';
 }
 
-function wait(ms) {
+function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -1336,6 +1337,7 @@ authPersistenceSettled.finally(() => {
             showLogin();
             return;
         }
+        currentUser = user;
         try {
             await loadProfile(user);
             showApp();
@@ -1371,14 +1373,13 @@ async function loadProfile(user) {
             }
             const data = snap.data();
             if (!isUserActive(data)) throw createProfileAccessError('inactive');
-            currentUser = user;
             currentProfile = data;
             return data;
         } catch (error) {
             if (!isRetryableProfileAccessError(error) || attempt === 2) {
                 throw error;
             }
-            await wait(300 * (attempt + 1));
+            await delay(PROFILE_LOAD_RETRY_DELAY_MS * Math.pow(2, attempt));
         }
     }
 }
@@ -1394,6 +1395,7 @@ window.retryProfileAccess = async function() {
     setLoginMessage('');
     try {
         await loadProfile(auth.currentUser);
+        currentUser = auth.currentUser;
         setLoginRetryVisible(false);
         showApp();
     } catch (error) {
@@ -1404,11 +1406,13 @@ window.retryProfileAccess = async function() {
     }
 };
 
-window.addEventListener('online', () => {
+window.__profileRetryOnlineListener = window.__profileRetryOnlineListener || (() => {
     if (auth.currentUser && !currentProfile) {
         window.retryProfileAccess();
     }
 });
+window.removeEventListener('online', window.__profileRetryOnlineListener);
+window.addEventListener('online', window.__profileRetryOnlineListener);
 
 // ── Show / hide screens ──────────────────────────────────────────────
 function showLogin() {
