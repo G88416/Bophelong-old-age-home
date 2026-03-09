@@ -1169,12 +1169,52 @@ const authPersistenceSettled = authPersistenceReady.catch(e => {
     console.warn('Auth persistence setup failed; continuing without configured local persistence.', e);
 });
 const db   = getFirestore(app);
-// ── TEMPORARY DEV AUTO-LOGIN ──────────────────────────────────────
+// ── CONFIGURED ADMIN ACCESS ───────────────────────────────────────
 const isDevHost = window.location.hostname === 'localhost'
     || window.location.hostname === '127.0.0.1';
+const configuredAdminEmail = normalizeEmail('admin@oldage.com');
 const devAdminEmail = 'admin@bophelong.test';
 const devAdminPassword = 'Boph3long-Dev-Only-2026!';
 let devAutoLoginAttempted = false;
+const DEFAULT_WORKSPACES = {
+    admin: 'users',
+    fallback: 'dashboard'
+};
+
+function isUserConfiguredAdmin(user) {
+    if (!user || !user.email) return false;
+    return normalizeEmail(user.email) === configuredAdminEmail;
+}
+
+async function ensureConfiguredAdminProfile(user) {
+    if (!user || !isUserConfiguredAdmin(user)) return;
+    const userRef = doc(db, 'users', user.uid);
+    const snap = await getDoc(userRef);
+    const profile = snap.exists() ? (snap.data() || {}) : {};
+    let profileEmail;
+    try {
+        profileEmail = requireAuthEmail(user);
+    } catch (error) {
+        throw new Error(`Unable to retrieve a valid email for configured admin profile sync: ${error?.message || 'unknown auth email error'}`);
+    }
+    const normalizedProfileEmail = normalizeEmail(profileEmail);
+    const profileName = String(profile.name || '').trim() || 'Main Admin';
+    const alreadyConfigured = snap.exists()
+        && normalizeUserRole(profile.role) === 'admin'
+        && isUserActive(profile)
+        && (!profile.email || normalizeEmail(profile.email) === normalizedProfileEmail)
+        && profile.uid === user.uid;
+
+    if (alreadyConfigured) return;
+
+    await setDoc(userRef, {
+        name: profileName,
+        email: normalizedProfileEmail,
+        role: 'admin',
+        active: true,
+        uid: user.uid
+    }, { merge: true });
+}
 
 async function maybeRunDevAutoLogin() {
     if (!isDevHost || devAutoLoginAttempted || auth.currentUser) return false;
@@ -1487,6 +1527,11 @@ authPersistenceSettled.finally(() => {
         }
         currentUser = user;
         try {
+            try {
+                await ensureConfiguredAdminProfile(user);
+            } catch (profileSyncError) {
+                console.error('Configured admin profile sync failed', profileSyncError);
+            }
             await loadProfile(user);
             showApp();
         } catch (e) {
@@ -1586,8 +1631,14 @@ function showApp() {
     initializeOrbMenu();
     renderUserInfo();
     updateClock();
-    navigateTo('dashboard');
+    navigateTo(getDefaultWorkspaceForProfile(currentProfile));
     loadDashboardStats();
+}
+
+function getDefaultWorkspaceForProfile(profile) {
+    return profile && profile.role === 'admin'
+        ? DEFAULT_WORKSPACES.admin
+        : DEFAULT_WORKSPACES.fallback;
 }
 
 // ── Sidebar builder ───────────────────────────────────────────────────
