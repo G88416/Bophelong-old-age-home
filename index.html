@@ -1003,7 +1003,7 @@
                 <div class="admin-grid">
                     <div class="card">
                         <div class="card-header">
-                            <h3>🛠️ Admin Workspace</h3>
+                            <h3>🛠️ Staff / User Management</h3>
                             <button class="btn btn-ghost btn-sm" onclick="loadUsers(); loadDashboardStats();">↻ Refresh</button>
                         </div>
                         <div class="card-body">
@@ -1016,6 +1016,7 @@
                             </div>
                             <div class="inline-actions" style="margin-top:16px;">
                                 <button class="btn btn-primary btn-sm" onclick="openModal('user')">+ Add User</button>
+                                <button class="btn btn-ghost btn-sm" onclick="navigateTo('finance')">💰 Open Finance</button>
                                 <button class="btn btn-ghost btn-sm" onclick="navigateTo('activities')">📜 View Audit Log</button>
                                 <button class="btn btn-ghost btn-sm" onclick="loadUsers()">🔄 Refresh Directory</button>
                             </div>
@@ -1934,7 +1935,7 @@ const NAV_ITEMS = [
     { id: 'tasks',       icon: '✅', label: 'Tasks',             roles: ['admin','staff','doctor'] },
     { id: 'medications', icon: '💊', label: 'Medications',       roles: ['admin','staff','doctor'] },
     { id: 'leaves',      icon: '🗓️', label: 'Leave Requests',    roles: ['admin','staff','doctor'] },
-    { id: 'users',       icon: '👥', label: 'Admin Workspace',   roles: ['admin'] },
+    { id: 'users',       icon: '👥', label: 'Staff / Users',     roles: ['admin'] },
     { id: 'finance',     icon: '💰', label: 'Finance',           roles: ['admin'] },
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
@@ -2155,7 +2156,7 @@ window.navigateTo = function(id) {
     const navEl = document.getElementById('nav-' + id);
     if (navEl) navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Admin Workspace',
+    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Staff / Users',
                      tasks:'Tasks', medications:'Medications', finance:'Finance',
                      leaves:'Leave Requests', activities:'Audit Log' };
     const subtitles = {
