@@ -1663,6 +1663,7 @@ function buildSessionProfile(user, profile = null) {
 }
 
 function getCurrentUserRole() {
+    if (!currentProfile) return 'staff';
     return normalizeUserRole(currentProfile && currentProfile.role);
 }
 
