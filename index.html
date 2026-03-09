@@ -693,10 +693,25 @@
             <!-- USERS -->
             <div class="section" id="sec-users">
                 <div class="stats-grid" id="admin-user-stats">
-                    <div class="stat-card purple">
+                    <div class="stat-card purple" aria-label="Managed Users statistics">
                         <div class="label">👥 Managed Users</div>
                         <div class="value">—</div>
                         <div class="sub">Loading user management metrics…</div>
+                    </div>
+                    <div class="stat-card cyan" aria-label="Admins on Duty statistics">
+                        <div class="label">🛡️ Admins on Duty</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading role coverage…</div>
+                    </div>
+                    <div class="stat-card amber" aria-label="Needs Attention statistics">
+                        <div class="label">⚠️ Needs Attention</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading access health…</div>
+                    </div>
+                    <div class="stat-card green" aria-label="Departments statistics">
+                        <div class="label">🏢 Departments</div>
+                        <div class="value">—</div>
+                        <div class="sub">Loading team structure…</div>
                     </div>
                 </div>
                 <div class="admin-grid">
@@ -2069,10 +2084,10 @@ function renderUserAdminWorkspace(filteredUsers = usersAll) {
         { label: 'Needs Attention', value: inactiveUsers, sub: inactiveUsers ? 'inactive account(s) paused' : 'all accounts active', cls: 'amber', icon: '⚠️' },
         { label: 'Departments', value: departments || '—', sub: `${staff} staff members assigned`, cls: 'green', icon: '🏢' },
     ].map(c => `
-        <div class="stat-card ${c.cls}">
-            <div class="label">${c.icon} ${c.label}</div>
-            <div class="value">${c.value}</div>
-            <div class="sub">${c.sub}</div>
+        <div class="stat-card ${c.cls}" aria-label="${escapeHTML(`${c.label} statistics`)}}">
+            <div class="label">${c.icon} ${escapeHTML(c.label)}</div>
+            <div class="value">${escapeHTML(c.value)}</div>
+            <div class="sub">${escapeHTML(c.sub)}</div>
         </div>
     `).join('');
 
@@ -2097,7 +2112,7 @@ function renderUserAdminWorkspace(filteredUsers = usersAll) {
     }
 
     const latestSummary = latestUsers.length
-        ? latestUsers.map(u => escapeHTML(u.name || u.email || 'Unnamed user')).join(', ')
+        ? escapeHTML(latestUsers.map(u => u.name || u.email || 'Unnamed user').join(', '))
         : 'No recent additions yet.';
     provisioningEl.innerHTML = `
         <div class="admin-list">
@@ -2159,10 +2174,11 @@ window.filterUsers = function() {
         const safeName = escapeHTML(u.name || '—');
         const safeEmail = escapeHTML(u.email || '—');
         const safeDept = escapeHTML(u.dept || '—');
-        const encodedId = encodeURIComponent(u._docId || '');
-        const editAction = `<button class="btn btn-ghost btn-sm" onclick='editUser(decodeURIComponent(${JSON.stringify(encodedId)}))'>✏️ Edit</button>`;
+        const safeDocId = escapeHTML(String(u._docId || ''));
+        const userLabel = escapeHTML(u.name || u.email || 'user');
+        const editAction = `<button class="btn btn-ghost btn-sm" data-user-id="${safeDocId}" onclick="editUser(this.dataset.userId)" aria-label="Edit ${userLabel}">✏️ Edit</button>`;
         const toggleAction = !isSelf
-            ? `<button class="btn btn-ghost btn-sm" onclick='toggleUserActive(decodeURIComponent(${JSON.stringify(encodedId)}),${isActive})'>${isActive ? '🔒 Deactivate' : '✅ Activate'}</button>`
+            ? `<button class="btn btn-ghost btn-sm" data-user-id="${safeDocId}" onclick="toggleUserActive(this.dataset.userId,${isActive})" aria-label="${escapeHTML(`${isActive ? 'Deactivate' : 'Activate'} ${u.name || u.email || 'user'} account`)}">${isActive ? '🔒 Deactivate' : '✅ Activate'}</button>`
             : '<span class="badge badge-purple">you</span>';
         return `<tr>
             <td><strong>${safeName}</strong></td>
@@ -2538,12 +2554,13 @@ window.saveUser = async function() {
         if (isEdit) {
             const existing = usersAll.find(u => u._docId === editingUserId);
             if (!existing) throw new Error('That user profile could not be found.');
+            if (!existing.uid) throw new Error('This user profile is missing its Firebase Authentication UID. Please recreate the user or repair the profile before editing.');
             await updateDoc(doc(db, 'users', editingUserId), {
                 name,
                 email,
                 dept,
                 role,
-                uid: existing.uid || editingUserId
+                uid: existing.uid
             });
             await logActivity(`Admin updated user profile: ${name} (${role})`);
             closeModal('user');
