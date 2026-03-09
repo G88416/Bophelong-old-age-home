@@ -1192,11 +1192,21 @@ function requireAuthEmail(user) {
     return email;
 }
 
+function createProfileAccessError(code) {
+    const messages = {
+        inactive: 'User profile is inactive.',
+        'no-profile': 'No profile document was found for the authenticated user.'
+    };
+    const error = new Error(messages[code] || 'Unable to load the authenticated user profile.');
+    error.code = code;
+    return error;
+}
+
 function getProfileAccessErrorMessage(error) {
-    const code = error && error.message;
+    const code = error && error.code;
     if (code === 'inactive') return 'Your account is inactive. Contact your administrator.';
     if (code === 'no-profile') return 'Profile not found. Contact your administrator.';
-    return 'Profile not found or account is inactive. Contact your administrator.';
+    return 'Unable to access your profile. Contact your administrator.';
 }
 
 function statusBadge(s) {
@@ -1304,12 +1314,12 @@ async function loadProfile(user) {
             qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
         }
         if (qs.empty) {
-            throw new Error('no-profile');
+            throw createProfileAccessError('no-profile');
         }
         snap = qs.docs[0];
     }
     const data = snap.data();
-    if (!isUserActive(data)) throw new Error('inactive');
+    if (!isUserActive(data)) throw createProfileAccessError('inactive');
     currentProfile = data;
 }
 
