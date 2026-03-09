@@ -1192,6 +1192,13 @@ function requireAuthEmail(user) {
     return email;
 }
 
+function getProfileAccessErrorMessage(error) {
+    const code = error && error.message;
+    if (code === 'inactive') return 'Your account is inactive. Contact your administrator.';
+    if (code === 'no-profile') return 'Profile not found. Contact your administrator.';
+    return 'Profile not found or account is inactive. Contact your administrator.';
+}
+
 function statusBadge(s) {
     const map = {
         active: 'badge-green', critical: 'badge-red', stable: 'badge-blue',
@@ -1273,7 +1280,7 @@ authPersistenceSettled.finally(() => {
         } catch (e) {
             await signOut(auth);
             const msgEl = document.getElementById('login-msg');
-            msgEl.textContent = 'Profile not found or account is inactive. Contact your administrator.';
+            msgEl.textContent = getProfileAccessErrorMessage(e);
             msgEl.className = 'login-msg error';
         }
     });
