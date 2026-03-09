@@ -1307,7 +1307,8 @@ function requireAuthEmail(user) {
 }
 
 function normalizeUserRole(role, fallback = 'staff') {
-    return VALID_USER_ROLES.has(role) ? role : fallback;
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    return VALID_USER_ROLES.has(normalizedRole) ? normalizedRole : fallback;
 }
 
 function deriveProfileName(user, profile) {
@@ -1332,6 +1333,38 @@ function buildSessionProfile(user, profile = null) {
         role: storedRole,
         active: true
     };
+}
+
+function pickBestProfileMatch(user, docs = []) {
+    if (!Array.isArray(docs) || !docs.length) return null;
+    const rawAuthEmail = String((user && user.email) || '').trim();
+    const normalizedAuthEmail = normalizeEmail(rawAuthEmail);
+    const docMeta = new Map();
+    const scoreDoc = snap => {
+        if (docMeta.has(snap)) return docMeta.get(snap);
+        const snapshotData = snap && typeof snap.data === 'function' ? snap.data() : null;
+        const data = snapshotData && typeof snapshotData === 'object'
+            ? snapshotData
+            : {};
+        const normalizedProfileEmail = normalizeEmail(data && data.email);
+        let score = 0;
+        if (snap && snap.id === user.uid) score += 100;
+        if (data && data.uid === user.uid) score += 80;
+        if (normalizedProfileEmail && normalizedProfileEmail === normalizedAuthEmail) score += 40;
+        if (data && data.email === rawAuthEmail) score += 10;
+        if (isUserActive(data)) score += 5;
+        const meta = { score, createdAtMillis: timestampToMillis(data.createdAt) };
+        docMeta.set(snap, meta);
+        return meta;
+    };
+
+    return [...docs].sort((left, right) => {
+        const rightMeta = scoreDoc(right);
+        const leftMeta = scoreDoc(left);
+        const scoreDiff = rightMeta.score - leftMeta.score;
+        if (scoreDiff) return scoreDiff;
+        return rightMeta.createdAtMillis - leftMeta.createdAtMillis;
+    })[0];
 }
 
 function getProfileAccessErrorMessage(error) {
@@ -1485,7 +1518,7 @@ async function loadProfile(user) {
                     currentProfile = buildSessionProfile(user);
                     return currentProfile;
                 }
-                snap = qs.docs[0];
+                snap = pickBestProfileMatch(user, qs.docs);
             }
             currentProfile = buildSessionProfile(user, snap.data());
             return currentProfile;
