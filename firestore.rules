@@ -91,7 +91,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAdmin() || isOwnUserDoc(userId);
+      allow read: if isOwnUserDoc(userId) || isAdmin();
       allow create, update: if isAdmin() && isUserPayload(request.resource.data, userId);
       allow delete: if isAdmin();
     }
