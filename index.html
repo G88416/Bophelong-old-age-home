@@ -1169,12 +1169,40 @@ const authPersistenceSettled = authPersistenceReady.catch(e => {
     console.warn('Auth persistence setup failed; continuing without configured local persistence.', e);
 });
 const db   = getFirestore(app);
-// ── TEMPORARY DEV AUTO-LOGIN ──────────────────────────────────────
+// ── CONFIGURED ADMIN ACCESS ───────────────────────────────────────
 const isDevHost = window.location.hostname === 'localhost'
     || window.location.hostname === '127.0.0.1';
-const devAdminEmail = 'admin@bophelong.test';
-const devAdminPassword = 'Boph3long-Dev-Only-2026!';
+const devAdminEmail = 'admin@oldage.com';
+const devAdminPassword = 'Tit24610';
 let devAutoLoginAttempted = false;
+
+function isConfiguredAdmin(user) {
+    return normalizeEmail(user && user.email) === devAdminEmail;
+}
+
+async function ensureConfiguredAdminProfile(user) {
+    if (!user || !isConfiguredAdmin(user)) return;
+    const userRef = doc(db, 'users', user.uid);
+    const snap = await getDoc(userRef);
+    const profile = snap.exists() ? (snap.data() || {}) : {};
+    const profileEmail = requireAuthEmail(user);
+    const profileName = String(profile.name || '').trim() || 'Main Admin';
+    const alreadyConfigured = snap.exists()
+        && normalizeUserRole(profile.role) === 'admin'
+        && isUserActive(profile)
+        && normalizeEmail(profile.email || profileEmail) === profileEmail
+        && profile.uid === user.uid;
+
+    if (alreadyConfigured) return;
+
+    await setDoc(userRef, {
+        name: profileName,
+        email: profileEmail,
+        role: 'admin',
+        active: true,
+        uid: user.uid
+    }, { merge: true });
+}
 
 async function maybeRunDevAutoLogin() {
     if (!isDevHost || devAutoLoginAttempted || auth.currentUser) return false;
@@ -1487,6 +1515,11 @@ authPersistenceSettled.finally(() => {
         }
         currentUser = user;
         try {
+            try {
+                await ensureConfiguredAdminProfile(user);
+            } catch (profileSyncError) {
+                console.error('Configured admin profile sync failed', profileSyncError);
+            }
             await loadProfile(user);
             showApp();
         } catch (e) {
@@ -1586,7 +1619,7 @@ function showApp() {
     initializeOrbMenu();
     renderUserInfo();
     updateClock();
-    navigateTo('dashboard');
+    navigateTo(currentProfile && currentProfile.role === 'admin' ? 'users' : 'dashboard');
     loadDashboardStats();
 }
 

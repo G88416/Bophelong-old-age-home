@@ -35,6 +35,16 @@ service cloud.firestore {
       return hasRole('admin');
     }
 
+    function isConfiguredAdminBootstrap(userId, data) {
+      return isSignedIn()
+        && userId == request.auth.uid
+        && authEmail() == 'admin@oldage.com'
+        && data.get('email', '') == authEmail()
+        && data.get('uid', '') == request.auth.uid
+        && data.get('role', '') == 'admin'
+        && data.get('active', false);
+    }
+
     function isDoctor() {
       return hasRole('doctor');
     }
@@ -91,7 +101,8 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwnUserDoc(userId) || isAdmin();
-      allow create, update: if isAdmin() && isUserPayload(request.resource.data, userId);
+      allow create, update: if (isAdmin() || isConfiguredAdminBootstrap(userId, request.resource.data))
+        && isUserPayload(request.resource.data, userId);
       allow delete: if isAdmin();
     }
 
