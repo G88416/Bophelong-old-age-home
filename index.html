@@ -1662,6 +1662,10 @@ function buildSessionProfile(user, profile = null) {
     };
 }
 
+function getCurrentUserRole() {
+    return normalizeUserRole(currentProfile && currentProfile.role);
+}
+
 function pickBestProfileMatch(user, docs = []) {
     if (!Array.isArray(docs) || !docs.length) return null;
     const rawAuthEmail = String((user && user.email) || '').trim();
@@ -1974,7 +1978,7 @@ const orbToggleHandler = () => window.toggleOrbMenu();
 const overlayClickHandler = () => window.toggleOrbMenu(false);
 
 function buildSidebar() {
-    const role = currentProfile.role;
+    const role = getCurrentUserRole();
     const nav  = document.getElementById('sidebar-nav');
     nav.innerHTML = '';
 
@@ -1993,7 +1997,7 @@ function buildSidebar() {
 function buildBottomNav() {
     const nav = document.getElementById('bottom-nav-items');
     if (!nav) return;
-    const role = currentProfile.role;
+    const role = getCurrentUserRole();
     nav.innerHTML = '';
 
     const visible = NAV_ITEMS.filter(n => n.roles.includes(role));
@@ -2051,8 +2055,9 @@ function renderUserInfo() {
     document.getElementById('user-name').textContent = p.name || p.email || '—';
     document.getElementById('user-avatar').textContent = (p.name || '?')[0].toUpperCase();
     const badge = document.getElementById('role-badge');
-    badge.textContent = p.role;
-    badge.className = 'role-badge role-' + p.role;
+    const role = getCurrentUserRole();
+    badge.textContent = role;
+    badge.className = 'role-badge role-' + role;
 }
 
 // ── Navigation ────────────────────────────────────────────────────────
@@ -2211,7 +2216,7 @@ function updateClock() {
 // ── Dashboard ─────────────────────────────────────────────────────────
 async function loadDashboardStats() {
     try {
-        const role = currentProfile.role;
+        const role = getCurrentUserRole();
         const baseQueries = [
             getDocs(collection(db, 'residents')),
             getDocs(collection(db, 'tasks')),
@@ -2388,7 +2393,7 @@ window.filterResidents = function() {
     const search   = (document.getElementById('resident-search')?.value || '').toLowerCase();
     const statusF  = document.getElementById('resident-status-filter')?.value || '';
     const cntEl    = document.getElementById('resident-count');
-    const role     = currentProfile.role;
+    const role     = getCurrentUserRole();
     const canEdit  = role === 'admin' || role === 'doctor';
 
     if (residentsAll.length === 0) {
@@ -2657,7 +2662,7 @@ async function loadTasks() {
             tb.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="e-icon">✅</div><p>No tasks found.</p></div></td></tr>';
             return;
         }
-        const role = currentProfile.role;
+        const role = getCurrentUserRole();
         tb.innerHTML = snap.docs.map(d => {
             const t = d.data();
             const pri = { high: 'badge-red', medium: 'badge-amber', low: 'badge-blue' };
@@ -2807,7 +2812,7 @@ async function loadLeaves() {
     const tb = document.getElementById('leaves-tbody');
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const role  = currentProfile.role;
+        const role  = getCurrentUserRole();
         let snap;
         if (role === 'admin') {
             snap = await getDocs(collection(db, 'leaves'));
