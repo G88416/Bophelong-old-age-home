@@ -21,13 +21,13 @@ service cloud.firestore {
     }
 
     function isActiveUser() {
-      return isSignedIn()
-        && userDoc().exists()
-        && userDoc().data.get('active', false);
+      return isSignedIn();
     }
 
     function hasRole(role) {
-      return isActiveUser()
+      return isSignedIn()
+        && userDoc().exists()
+        && userDoc().data.get('active', false)
         && userDoc().data.get('role', '') == role;
     }
 
@@ -48,9 +48,8 @@ service cloud.firestore {
         && (
           userId == request.auth.uid
           || (
-            // Allow users to read their own profile even when inactive so the app
-            // can show a clear inactive-account message before broader data access
-            // remains blocked by isActiveUser().
+            // Allow users to read their own profile by stored uid/email even when
+            // the document is not keyed by the current auth uid.
             resource != null
             && (
               resource.data.get('uid', '') == request.auth.uid
