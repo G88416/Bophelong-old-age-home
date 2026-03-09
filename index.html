@@ -1307,7 +1307,8 @@ function requireAuthEmail(user) {
 }
 
 function normalizeUserRole(role, fallback = 'staff') {
-    return VALID_USER_ROLES.has(role) ? role : fallback;
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    return VALID_USER_ROLES.has(normalizedRole) ? normalizedRole : fallback;
 }
 
 function deriveProfileName(user, profile) {
@@ -1332,6 +1333,29 @@ function buildSessionProfile(user, profile = null) {
         role: storedRole,
         active: true
     };
+}
+
+function pickBestProfileMatch(user, docs = []) {
+    if (!Array.isArray(docs) || !docs.length) return null;
+    const rawAuthEmail = String((user && user.email) || '').trim();
+    const normalizedAuthEmail = normalizeEmail(rawAuthEmail);
+    const scoreDoc = snap => {
+        const data = snap && typeof snap.data === 'function' ? snap.data() : {};
+        const normalizedProfileEmail = normalizeEmail(data && data.email);
+        let score = 0;
+        if (snap && snap.id === user.uid) score += 100;
+        if (data && data.uid === user.uid) score += 80;
+        if (normalizedProfileEmail && normalizedProfileEmail === normalizedAuthEmail) score += 40;
+        if (data && data.email === rawAuthEmail) score += 10;
+        if (isUserActive(data)) score += 5;
+        return score;
+    };
+
+    return [...docs].sort((left, right) => {
+        const scoreDiff = scoreDoc(right) - scoreDoc(left);
+        if (scoreDiff) return scoreDiff;
+        return timestampToMillis(right.data().createdAt) - timestampToMillis(left.data().createdAt);
+    })[0];
 }
 
 function getProfileAccessErrorMessage(error) {
@@ -1485,7 +1509,7 @@ async function loadProfile(user) {
                     currentProfile = buildSessionProfile(user);
                     return currentProfile;
                 }
-                snap = qs.docs[0];
+                snap = pickBestProfileMatch(user, qs.docs);
             }
             currentProfile = buildSessionProfile(user, snap.data());
             return currentProfile;
