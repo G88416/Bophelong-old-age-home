@@ -20,14 +20,14 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
-    function isActiveUser() {
-      return isSignedIn()
-        && userDoc().exists()
-        && userDoc().data.get('active', false);
+    function hasAppAccess() {
+      return isSignedIn();
     }
 
     function hasRole(role) {
-      return isActiveUser()
+      return isSignedIn()
+        && userDoc().exists()
+        && userDoc().data.get('active', false)
         && userDoc().data.get('role', '') == role;
     }
 
@@ -48,9 +48,8 @@ service cloud.firestore {
         && (
           userId == request.auth.uid
           || (
-            // Allow users to read their own profile even when inactive so the app
-            // can show a clear inactive-account message before broader data access
-            // remains blocked by isActiveUser().
+            // Allow users to read their own profile by stored uid/email even when
+            // the document is not keyed by the current auth uid.
             resource != null
             && (
               resource.data.get('uid', '') == request.auth.uid
@@ -98,7 +97,7 @@ service cloud.firestore {
 
     match /activities/{activityId} {
       allow read: if isAdmin();
-      allow create: if isActiveUser() && isActivityPayload();
+      allow create: if hasAppAccess() && isActivityPayload();
       allow update, delete: if isAdmin();
     }
 
@@ -116,8 +115,8 @@ service cloud.firestore {
 
     match /leaves/{leaveId} {
       allow read: if isAdmin()
-        || (isActiveUser() && resource != null && resource.data.staffUid == request.auth.uid);
-      allow create: if isActiveUser()
+        || (hasAppAccess() && resource != null && resource.data.staffUid == request.auth.uid);
+      allow create: if hasAppAccess()
         && hasStaffUid(request.resource.data)
         && request.resource.data.staffUid == request.auth.uid;
       allow update: if isAdmin()
@@ -128,17 +127,17 @@ service cloud.firestore {
     }
 
     match /residents/{docId} {
-      allow read, create: if isActiveUser();
+      allow read, create: if hasAppAccess();
       allow update, delete: if canManageResidents();
     }
 
     match /tasks/{docId} {
-      allow read, create, update: if isActiveUser();
+      allow read, create, update: if hasAppAccess();
       allow delete: if isAdmin();
     }
 
     match /medications/{docId} {
-      allow read, create: if isActiveUser();
+      allow read, create: if hasAppAccess();
       allow update, delete: if isAdmin();
     }
   }

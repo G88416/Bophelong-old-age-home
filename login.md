@@ -7,11 +7,15 @@ This portal uses Firebase email/password authentication.
 2. Enter the email address and password provided by your administrator.
 3. Click **Sign In**.
 
+Any valid Firebase email/password account can now sign in even if a matching
+Firestore profile is missing or marked inactive. In those cases the portal opens
+with standard staff access until an administrator assigns an active role profile.
+
 ## Need an account?
 Ask an administrator to create a user account from the **Staff & Users** section
 inside the portal. The admin must supply you with:
 - Your email address
 - Your temporary or permanent password (minimum 8 characters)
 
-If your account is inactive or you cannot sign in, contact your administrator to
-activate or reset your access.
+If you cannot sign in because of your email or password, contact your
+administrator to reset your access.

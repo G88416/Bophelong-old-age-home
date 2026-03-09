@@ -1094,7 +1094,7 @@ async function maybeRunDevAutoLogin() {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, devAdminEmail, devAdminPassword);
             console.log('🔧 Dev admin created & logged in →', userCredential.user.email);
-            console.warn('Create a matching Firestore profile document for this local dev account if you need app access.');
+            console.warn('Create a matching Firestore profile document for this local dev account if you need admin or doctor access.');
             return true;
         } catch (createErr) {
             console.error('Dev auto-create failed', createErr);
@@ -1135,6 +1135,7 @@ let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
 const PROFILE_LOAD_RETRY_DELAY_MS = 300;
+const VALID_USER_ROLES = new Set(['admin', 'staff', 'doctor']);
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1195,37 +1196,48 @@ function requireAuthEmail(user) {
     return email;
 }
 
-function createProfileAccessError(code) {
-    const messages = {
-        inactive: 'User profile is inactive.',
-        'no-profile': 'No profile document was found for the authenticated user.'
+function normalizeUserRole(role, fallback = 'staff') {
+    return VALID_USER_ROLES.has(role) ? role : fallback;
+}
+
+function deriveProfileName(user, profile) {
+    const storedName = String((profile && profile.name) || '').trim();
+    if (storedName) return storedName;
+    const displayName = String((user && user.displayName) || '').trim();
+    if (displayName) return displayName;
+    const email = requireAuthEmail(user);
+    return email.includes('@') ? email.split('@')[0] : email;
+}
+
+function buildSessionProfile(user, profile = null) {
+    const storedProfile = profile && typeof profile === 'object' ? profile : {};
+    const storedRole = profile && isUserActive(storedProfile)
+        ? normalizeUserRole(storedProfile.role)
+        : 'staff';
+    return {
+        ...storedProfile,
+        uid: user.uid,
+        email: normalizeEmail(storedProfile.email || requireAuthEmail(user)),
+        name: deriveProfileName(user, storedProfile),
+        role: storedRole,
+        active: true
     };
-    const error = new Error(messages[code] || 'Unable to load the authenticated user profile.');
-    error.code = code;
-    return error;
 }
 
 function getProfileAccessErrorMessage(error) {
     const code = normalizeFirebaseErrorCode(error && error.code);
-    if (code === 'inactive') return 'Your account is inactive. Contact your administrator.';
-    if (code === 'no-profile') return 'Profile not found. Contact your administrator.';
     if (!navigator.onLine) return 'You are offline. Reconnect to the internet and retry.';
     if (code === 'unavailable' || code === 'deadline-exceeded') return 'We could not reach the server. Please retry in a moment.';
-    if (code === 'permission-denied') return 'Your sign-in succeeded, but your profile could not be opened right now. Please retry or contact your administrator.';
-    return 'Unable to access your profile. Contact your administrator.';
+    if (code === 'permission-denied') return 'Your sign-in succeeded, but the app data could not be opened right now. Please retry in a moment.';
+    return 'Unable to complete sign-in right now. Please retry.';
 }
 
 function normalizeFirebaseErrorCode(code) {
     return String(code || '').replace(/^[^/]+\//, '');
 }
 
-function isPermanentProfileAccessError(error) {
-    const code = normalizeFirebaseErrorCode(error && error.code);
-    return code === 'inactive' || code === 'no-profile';
-}
-
 function isRetryableProfileAccessError(error) {
-    if (!error || isPermanentProfileAccessError(error)) return false;
+    if (!error) return false;
     if (!navigator.onLine) return true;
     const code = normalizeFirebaseErrorCode(error.code);
     return code === 'unavailable'
@@ -1251,13 +1263,6 @@ function setLoginRetryVisible(visible) {
 async function finishProfileAccessFailure(error) {
     currentProfile = null;
     showLogin();
-    if (isPermanentProfileAccessError(error)) {
-        await signOut(auth);
-        setLoginRetryVisible(false);
-        setLoginMessage(getProfileAccessErrorMessage(error), 'error');
-        return false;
-    }
-
     setLoginRetryVisible(true);
     setLoginMessage(getProfileAccessErrorMessage(error), 'info');
     return false;
@@ -1367,14 +1372,13 @@ async function loadProfile(user) {
                     qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
                 }
                 if (qs.empty) {
-                    throw createProfileAccessError('no-profile');
+                    currentProfile = buildSessionProfile(user);
+                    return currentProfile;
                 }
                 snap = qs.docs[0];
             }
-            const data = snap.data();
-            if (!isUserActive(data)) throw createProfileAccessError('inactive');
-            currentProfile = data;
-            return data;
+            currentProfile = buildSessionProfile(user, snap.data());
+            return currentProfile;
         } catch (error) {
             if (!isRetryableProfileAccessError(error) || attempt === 2) {
                 throw error;
