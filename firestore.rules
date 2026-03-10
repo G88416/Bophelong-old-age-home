@@ -20,15 +20,25 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
+    function isConfiguredAdmin() {
+      return isSignedIn()
+        && authEmail() == 'admin@oldage.com';
+    }
+
     function hasAppAccess() {
       return isSignedIn();
     }
 
     function hasRole(role) {
       return isSignedIn()
-        && userDoc().exists()
-        && userDoc().data.get('active', false)
-        && userDoc().data.get('role', '') == role;
+        && (
+          (role == 'admin' && isConfiguredAdmin())
+          || (
+            userDoc().exists()
+            && userDoc().data.get('active', false)
+            && userDoc().data.get('role', '') == role
+          )
+        );
     }
 
     function isAdmin() {
@@ -86,6 +96,21 @@ service cloud.firestore {
         && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp);
     }
 
+    function isStaffDirectoryPayload(data) {
+      return data.keys().hasAll(['name', 'position', 'department', 'phone', 'email'])
+        && data.keys().hasOnly(['name', 'position', 'department', 'phone', 'email', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.name.size() > 0
+        && data.position is string
+        && data.position.size() > 0
+        && data.department is string
+        && data.phone is string
+        && data.email is string
+        && data.email.size() > 0
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
     function hasStaffUid(data) {
       return data.keys().hasAll(['staffUid']);
     }
@@ -110,6 +135,12 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if hasAppAccess() && isActivityPayload();
       allow update, delete: if isAdmin();
+    }
+
+    match /staffDirectory/{staffId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && isStaffDirectoryPayload(request.resource.data);
     }
 
     match /donations/{docId} {
