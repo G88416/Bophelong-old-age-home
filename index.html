@@ -1007,7 +1007,7 @@
                             <button class="btn btn-ghost btn-sm" onclick="loadUsers(); loadDashboardStats();">↻ Refresh</button>
                         </div>
                         <div class="card-body">
-                            <div class="alert alert-info">Provision accounts, assign roles, and keep staff access aligned with Firebase Authentication from one workspace.</div>
+                            <div class="alert alert-info">Provision accounts, assign roles, and keep user access aligned with Firebase Authentication from one workspace.</div>
                             <div class="admin-list" id="admin-resource-list">
                                 <div class="admin-list-item">
                                     <strong>Preparing admin resources…</strong>
@@ -1238,8 +1238,8 @@
 <!-- User modal -->
 <div class="modal-overlay" id="modal-user" hidden>
     <div class="modal">
-        <h3 id="user-modal-title">👤 Add Staff / User</h3>
-        <div class="alert alert-info" id="user-auth-note">Create a Firebase Authentication login and matching staff profile so the user can sign in immediately.</div>
+        <h3 id="user-modal-title">👤 Add User</h3>
+        <div class="alert alert-info" id="user-auth-note">Create a Firebase Authentication login and matching user profile so the user can sign in immediately.</div>
         <div class="form-group"><label>Full Name *</label><input id="u-name" placeholder="Full name"></div>
         <div class="form-group">
             <label>Email Address *</label>
@@ -1942,7 +1942,7 @@ const NAV_ITEMS = [
     { id: 'tasks',       icon: '✅', label: 'Tasks',             roles: ['admin','staff','doctor'] },
     { id: 'medications', icon: '💊', label: 'Medications',       roles: ['admin','staff','doctor'] },
     { id: 'leaves',      icon: '🗓️', label: 'Leave Requests',    roles: ['admin','staff','doctor'] },
-    { id: 'users',       icon: '👥', label: 'Staff / Users',     roles: ['admin'] },
+    { id: 'users',       icon: '👥', label: 'Users',             roles: ['admin'] },
     { id: 'finance',     icon: '💰', label: 'Finance',           roles: ['admin'] },
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
@@ -2164,13 +2164,13 @@ window.navigateTo = function(id) {
     const navEl = document.getElementById('nav-' + id);
     if (navEl) navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Staff / Users',
+    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Users',
                      tasks:'Tasks', medications:'Medications', finance:'Finance',
                      leaves:'Leave Requests', activities:'Audit Log' };
     const subtitles = {
         dashboard: 'Track residents, staffing, and home operations in one place.',
         residents: 'Review resident wellbeing, room details, and care status updates.',
-        users: 'Provision staff access, roles, and administrative coverage.',
+        users: 'Provision user access, roles, and administrative coverage.',
         tasks: 'Monitor assignments, priority items, and operational progress.',
         medications: 'Keep medication schedules and treatment records easy to review.',
         finance: 'Manage donations, income, and expenditure with a clearer overview.',
@@ -2505,7 +2505,7 @@ function renderUserAdminWorkspace(filteredUsers = usersAll) {
     `;
 
     if (!totalUsers) {
-        provisioningEl.innerHTML = '<div class="empty"><div class="e-icon">👤</div><p>No staff profiles exist yet. Use “Add User” to create the first Firebase-backed account.</p></div>';
+        provisioningEl.innerHTML = '<div class="empty"><div class="e-icon">👤</div><p>No user profiles exist yet. Use “Add User” to create the first Firebase-backed account.</p></div>';
         return;
     }
 
@@ -2629,14 +2629,14 @@ function configureUserModal(mode = 'create', user = null) {
 
     email.readOnly = !!isEdit;
     if (isEdit) {
-        title.textContent = '✏️ Edit Staff / User';
+        title.textContent = '✏️ Edit User';
         note.textContent = 'Update the in-app profile for this user. Email and password changes must still be handled directly in Firebase Authentication.';
         emailHelp.textContent = 'Email is locked here to keep the existing Firebase Authentication login aligned.';
         passwordFields.hidden = true;
         saveBtn.textContent = 'Save Changes';
     } else {
-        title.textContent = '👤 Add Staff / User';
-        note.textContent = 'Create a Firebase Authentication login and matching staff profile so the user can sign in immediately.';
+        title.textContent = '👤 Add User';
+        note.textContent = 'Create a Firebase Authentication login and matching user profile so the user can sign in immediately.';
         emailHelp.textContent = 'This email is used for the Firebase Authentication sign-in.';
         passwordFields.hidden = false;
         saveBtn.textContent = 'Create User';
