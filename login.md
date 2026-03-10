@@ -16,7 +16,7 @@ always opens the admin workspace after sign-in so the main admin can recover
 access even if the matching Firestore profile still needs to be synchronized.
 
 ## Need an account?
-Ask an administrator to create a user account from the **Staff & Users** section
+Ask an administrator to create a user account from the **Users** section
 inside the portal. The admin must supply you with:
 - Your email address
 - Your temporary or permanent password (minimum 8 characters)
