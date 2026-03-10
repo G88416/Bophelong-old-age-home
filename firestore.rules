@@ -104,7 +104,9 @@ service cloud.firestore {
         && data.position is string
         && data.position.size() > 0
         && data.department is string
+        && data.department.size() > 0
         && data.phone is string
+        && data.phone.size() > 0
         && data.email is string
         && data.email.size() > 0
         && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)

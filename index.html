@@ -1234,8 +1234,8 @@
             <label>Role / Position *</label>
             <input id="u-position" placeholder="e.g. Senior Caregiver">
         </div>
-        <div class="form-group"><label>Department</label><input id="u-dept" placeholder="e.g. Caregiving Ward"></div>
-        <div class="form-group"><label>Phone</label><input id="u-phone" type="tel" placeholder="e.g. +27 12 345 6789"></div>
+        <div class="form-group"><label>Department *</label><input id="u-department" placeholder="e.g. Caregiving Ward"></div>
+        <div class="form-group"><label>Phone *</label><input id="u-phone" type="tel" placeholder="e.g. +27 12 345 6789"></div>
         <div class="form-group">
             <label>Email Address *</label>
             <input id="u-email" type="email" placeholder="staff@example.com">
@@ -1596,6 +1596,11 @@ function timestampToMillis(value) {
     if (typeof value.seconds === 'number') return value.seconds * 1000;
     const parsed = Date.parse(value);
     return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function getLatestEntryTimestamp(entry) {
+    if (!entry || typeof entry !== 'object') return 0;
+    return Math.max(timestampToMillis(entry.updatedAt), timestampToMillis(entry.createdAt));
 }
 
 function requireAuthEmail(user) {
@@ -2462,7 +2467,7 @@ function renderUserAdminWorkspace(filteredUsers = usersAll) {
     const missingContacts = usersAll.filter(u => !String(u.phone || '').trim() || !String(u.email || '').trim()).length;
     const filteredCount = Array.isArray(filteredUsers) ? filteredUsers.length : totalUsers;
     const latestUsers = [...usersAll]
-        .sort((a, b) => Math.max(timestampToMillis(b.updatedAt), timestampToMillis(b.createdAt)) - Math.max(timestampToMillis(a.updatedAt), timestampToMillis(a.createdAt)))
+        .sort((a, b) => getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a))
         .slice(0, 3);
 
     statsEl.innerHTML = [
@@ -2611,7 +2616,7 @@ function configureUserModal(mode = 'create', user = null) {
     editingUserId = isEdit ? user._docId : null;
     document.getElementById('u-name').value = isEdit ? (user.name || '') : '';
     document.getElementById('u-position').value = isEdit ? (user.position || '') : '';
-    document.getElementById('u-dept').value = isEdit ? (user.department || '') : '';
+    document.getElementById('u-department').value = isEdit ? (user.department || '') : '';
     document.getElementById('u-phone').value = isEdit ? (user.phone || '') : '';
     email.value = isEdit ? (user.email || '') : '';
 
@@ -2928,13 +2933,13 @@ window.saveUser = async function() {
     }
     const name       = document.getElementById('u-name').value.trim();
     const position   = document.getElementById('u-position').value.trim();
-    const department = document.getElementById('u-dept').value.trim();
+    const department = document.getElementById('u-department').value.trim();
     const phone      = document.getElementById('u-phone').value.trim();
     const email      = normalizeEmail(document.getElementById('u-email').value);
     const isEdit     = !!editingUserId;
 
-    if (!name || !position || !email) {
-        modalMsg('user', 'Name, role / position, and email are required.', 'error');
+    if (!name || !position || !department || !phone || !email) {
+        modalMsg('user', 'Name, role / position, department, phone, and email are required.', 'error');
         return;
     }
 
