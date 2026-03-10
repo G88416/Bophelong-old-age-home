@@ -142,7 +142,7 @@ service cloud.firestore {
         && data.desc.size() > 0
         && data.desc.size() <= 500
         && (!data.keys().hasAll(['assignedTo']) || data.assignedTo is string)
-        && (!data.keys().hasAll(['dueDate']) || data.dueDate is string)
+        && (!data.keys().hasAll(['dueDate']) || data.dueDate is timestamp)
         && data.priority is string
         && (data.priority == 'high' || data.priority == 'medium' || data.priority == 'low')
         && (!data.keys().hasAll(['notes']) || (data.notes is string && data.notes.size() <= 2000))
@@ -160,8 +160,7 @@ service cloud.firestore {
         && data.title is string
         && data.title.size() > 0
         && data.title.size() <= 300
-        && data.date is string
-        && data.date.size() > 0
+        && data.date is timestamp
         && (!data.keys().hasAll(['type']) || data.type is string)
         && (!data.keys().hasAll(['venue']) || data.venue is string)
         && (!data.keys().hasAll(['coordinator']) || data.coordinator is string)
@@ -182,8 +181,7 @@ service cloud.firestore {
         && data.inspector is string
         && data.inspector.size() > 0
         && data.inspector.size() <= 300
-        && data.date is string
-        && data.date.size() > 0
+        && data.date is timestamp
         && data.status is string
         && isValidInspectionStatus(data.status)
         && data.findings is string

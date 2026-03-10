@@ -1690,6 +1690,11 @@ function fmtDate(val) {
     return String(val).slice(0, 10);
 }
 
+function parseDateInput(value) {
+    if (!value) return null;
+    return new Date(`${value}T00:00:00`);
+}
+
 function parseAmount(value) {
     const normalized = String(value || '').replace(/,/g, '').trim();
     if (!normalized) return NaN;
@@ -1718,6 +1723,7 @@ function isUserActive(profile) {
 
 function timestampToMillis(value) {
     if (!value) return 0;
+    if (value instanceof Date) return value.getTime();
     if (typeof value.toMillis === 'function') return value.toMillis();
     if (typeof value.toDate === 'function') return value.toDate().getTime();
     if (typeof value.seconds === 'number') return value.seconds * 1000;
@@ -2791,10 +2797,14 @@ async function loadTasks() {
         const snap = await getDocs(collection(db, 'tasks'));
         tasksAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
             .sort((a, b) => {
-                const aOpen = (a.status || 'pending') === 'completed' ? 1 : 0;
-                const bOpen = (b.status || 'pending') === 'completed' ? 1 : 0;
-                if (aOpen !== bOpen) return aOpen - bOpen;
-                const dueDiff = timestampToMillis(a.dueDate) - timestampToMillis(b.dueDate);
+                const aIsCompleted = (a.status || 'pending') === 'completed' ? 1 : 0;
+                const bIsCompleted = (b.status || 'pending') === 'completed' ? 1 : 0;
+                if (aIsCompleted !== bIsCompleted) return aIsCompleted - bIsCompleted;
+                const aDue = timestampToMillis(a.dueDate);
+                const bDue = timestampToMillis(b.dueDate);
+                if (!aDue && bDue) return 1;
+                if (aDue && !bDue) return -1;
+                const dueDiff = aDue - bDue;
                 if (dueDiff !== 0) return dueDiff;
                 return getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a);
             });
@@ -2822,7 +2832,7 @@ window.filterTasks = function() {
         const query = [
             task.desc,
             task.assignedTo,
-            task.dueDate,
+            fmtDate(task.dueDate),
             task.notes,
             task.priority,
             task.status
@@ -2900,7 +2910,7 @@ async function loadEvents() {
     try {
         const snap = await getDocs(collection(db, 'events'));
         eventsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => timestampToMillis(a.date) - timestampToMillis(b.date) || getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a));
+            .sort((a, b) => (timestampToMillis(a.date) - timestampToMillis(b.date)) || (getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a)));
         filterEvents();
     } catch (e) {
         eventsAll = [];
@@ -2928,7 +2938,7 @@ window.filterEvents = function() {
             event.venue,
             event.coordinator,
             event.notes,
-            event.date,
+            fmtDate(event.date),
             event.status
         ].join(' ').toLowerCase();
         const matchesSearch = !search || query.includes(search);
@@ -2997,7 +3007,7 @@ async function loadInspections() {
     try {
         const snap = await getDocs(collection(db, 'inspections'));
         inspectionsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => timestampToMillis(b.date) - timestampToMillis(a.date) || getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a));
+            .sort((a, b) => (timestampToMillis(b.date) - timestampToMillis(a.date)) || (getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a)));
         filterInspections();
     } catch (e) {
         inspectionsAll = [];
@@ -3024,7 +3034,7 @@ window.filterInspections = function() {
             inspection.inspector,
             inspection.findings,
             inspection.recommendations,
-            inspection.date,
+            fmtDate(inspection.date),
             inspection.status
         ].join(' ').toLowerCase();
         const matchesSearch = !search || query.includes(search);
@@ -3368,17 +3378,18 @@ window.saveTask = async function() {
     const priority = document.getElementById('t-priority').value;
     const notes    = document.getElementById('t-notes').value.trim();
     if (!desc) { modalMsg('task', 'Description is required.', 'error'); return; }
+    const dueDateValue = parseDateInput(dueDate);
     try {
         await addDoc(collection(db, 'tasks'), {
             desc,
             assignedTo,
-            dueDate,
             priority,
             notes,
             status: 'pending',
             createdBy: currentUser.uid,
             createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
+            updatedAt: serverTimestamp(),
+            ...(dueDateValue ? { dueDate: dueDateValue } : {})
         });
         await logActivity(`Task created: "${desc}" (${priority} priority)`);
         closeModal('task');
@@ -3397,10 +3408,11 @@ window.saveEvent = async function() {
     const status = document.getElementById('ev-status').value;
     const notes = document.getElementById('ev-notes').value.trim();
     if (!title || !date) { modalMsg('event', 'Event name and date are required.', 'error'); return; }
+    const eventDate = parseDateInput(date);
     try {
         await addDoc(collection(db, 'events'), {
             title,
-            date,
+            date: eventDate,
             type,
             venue,
             coordinator,
@@ -3429,11 +3441,12 @@ window.saveInspection = async function() {
         modalMsg('inspection', 'Department, inspector, visit date, and findings are required.', 'error');
         return;
     }
+    const inspectionDate = parseDateInput(date);
     try {
         await addDoc(collection(db, 'inspections'), {
             department,
             inspector,
-            date,
+            date: inspectionDate,
             status,
             findings,
             recommendations,
