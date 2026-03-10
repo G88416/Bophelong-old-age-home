@@ -117,6 +117,82 @@ service cloud.firestore {
       return data.keys().hasAll(['staffUid']);
     }
 
+    function isValidTaskStatus(status) {
+      return status == 'pending'
+        || status == 'in-progress'
+        || status == 'completed';
+    }
+
+    function isValidEventStatus(status) {
+      return status == 'scheduled'
+        || status == 'in-progress'
+        || status == 'completed';
+    }
+
+    function isValidInspectionStatus(status) {
+      return status == 'compliant'
+        || status == 'follow-up'
+        || status == 'critical';
+    }
+
+    function isTaskPayload(data) {
+      return data.keys().hasAll(['desc', 'priority', 'status', 'createdBy'])
+        && data.keys().hasOnly(['desc', 'assignedTo', 'dueDate', 'priority', 'notes', 'status', 'createdBy', 'createdAt', 'updatedAt', 'completedAt'])
+        && data.desc is string
+        && data.desc.size() > 0
+        && data.desc.size() <= 500
+        && (!data.keys().hasAll(['assignedTo']) || data.assignedTo is string)
+        && (!data.keys().hasAll(['dueDate']) || data.dueDate is timestamp)
+        && data.priority is string
+        && (data.priority == 'high' || data.priority == 'medium' || data.priority == 'low')
+        && (!data.keys().hasAll(['notes']) || (data.notes is string && data.notes.size() <= 2000))
+        && data.status is string
+        && isValidTaskStatus(data.status)
+        && data.createdBy is string
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp)
+        && (!data.keys().hasAll(['completedAt']) || data.completedAt is timestamp);
+    }
+
+    function isEventPayload(data) {
+      return data.keys().hasAll(['title', 'date', 'status', 'createdBy'])
+        && data.keys().hasOnly(['title', 'date', 'type', 'venue', 'coordinator', 'status', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 300
+        && data.date is timestamp
+        && (!data.keys().hasAll(['type']) || data.type is string)
+        && (!data.keys().hasAll(['venue']) || data.venue is string)
+        && (!data.keys().hasAll(['coordinator']) || data.coordinator is string)
+        && data.status is string
+        && isValidEventStatus(data.status)
+        && (!data.keys().hasAll(['notes']) || (data.notes is string && data.notes.size() <= 2000))
+        && data.createdBy is string
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
+    function isInspectionPayload(data) {
+      return data.keys().hasAll(['department', 'inspector', 'date', 'status', 'findings', 'createdBy'])
+        && data.keys().hasOnly(['department', 'inspector', 'date', 'status', 'findings', 'recommendations', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.department is string
+        && data.department.size() > 0
+        && data.department.size() <= 300
+        && data.inspector is string
+        && data.inspector.size() > 0
+        && data.inspector.size() <= 300
+        && data.date is timestamp
+        && data.status is string
+        && isValidInspectionStatus(data.status)
+        && data.findings is string
+        && data.findings.size() > 0
+        && data.findings.size() <= 5000
+        && (!data.keys().hasAll(['recommendations']) || (data.recommendations is string && data.recommendations.size() <= 5000))
+        && data.createdBy is string
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
     function isActivityPayload() {
       return request.resource.data.keys().hasAll(['msg', 'date', 'uid'])
         && request.resource.data.msg is string
@@ -176,7 +252,23 @@ service cloud.firestore {
     }
 
     match /tasks/{docId} {
-      allow read, create, update: if hasAppAccess();
+      allow read: if hasAppAccess();
+      allow create, update: if hasAppAccess()
+        && isTaskPayload(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /events/{docId} {
+      allow read: if hasAppAccess();
+      allow create, update: if hasAppAccess()
+        && isEventPayload(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /inspections/{docId} {
+      allow read: if hasAppAccess();
+      allow create, update: if hasAppAccess()
+        && isInspectionPayload(request.resource.data);
       allow delete: if isAdmin();
     }
 
