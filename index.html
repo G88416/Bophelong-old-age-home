@@ -1949,7 +1949,11 @@ const NAV_ITEMS = [
 
 function canAccessWorkspace(id, role = getCurrentUserRole()) {
     const navItem = NAV_ITEMS.find(item => item.id === id);
-    return !navItem || navItem.roles.includes(role);
+    return !!navItem && (!Array.isArray(navItem.roles) || navItem.roles.includes(role));
+}
+
+function getWorkspaceLabel(id) {
+    return NAV_ITEMS.find(item => item.id === id)?.label || id;
 }
 
 const ORB_ACTIONS = [
@@ -2160,7 +2164,7 @@ window.toggleOrbMenu = function(forceState) {
 window.navigateTo = function(id) {
     const requestedId = id;
     if (!canAccessWorkspace(requestedId)) {
-        toast('Only admins can access the Staff / Users workspace.');
+        toast(`Only admins can access the ${getWorkspaceLabel(requestedId)} workspace.`);
         id = getDefaultWorkspaceForProfile(currentProfile);
     }
     // Hide all sections
