@@ -1649,9 +1649,11 @@ function deriveProfileName(user, profile) {
 
 function buildSessionProfile(user, profile = null) {
     const storedProfile = profile && typeof profile === 'object' ? profile : {};
-    const storedRole = profile && isUserActive(storedProfile)
-        ? normalizeUserRole(storedProfile.role)
-        : 'staff';
+    const storedRole = isUserConfiguredAdmin(user)
+        ? 'admin'
+        : (profile && isUserActive(storedProfile)
+            ? normalizeUserRole(storedProfile.role)
+            : 'staff');
     return {
         ...storedProfile,
         uid: user.uid,
