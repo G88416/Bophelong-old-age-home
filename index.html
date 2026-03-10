@@ -1061,13 +1061,83 @@
                         <h3>✅ Tasks</h3>
                         <button class="btn btn-primary btn-sm" onclick="openModal('task')">+ Add Task</button>
                     </div>
+                    <div class="search-bar">
+                        <input id="task-search" placeholder="🔍 Search by task, assignee, due date or notes…" oninput="filterTasks()">
+                        <select id="task-status-filter" onchange="filterTasks()">
+                            <option value="">All statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                        <span class="result-count" id="task-count"></span>
+                    </div>
                     <div class="card-body" style="padding:0">
                         <table>
                             <thead>
-                                <tr><th>Description</th><th>Priority</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Task</th><th>Assigned To</th><th>Due Date</th><th>Priority</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody id="tasks-tbody">
-                                <tr><td colspan="4"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
+                                <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EVENTS -->
+            <div class="section" id="sec-events">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📅 Events Management</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openModal('event')">+ Add Event</button>
+                    </div>
+                    <div class="search-bar">
+                        <input id="event-search" placeholder="🔍 Search by event, venue, coordinator or notes…" oninput="filterEvents()">
+                        <select id="event-status-filter" onchange="filterEvents()">
+                            <option value="">All statuses</option>
+                            <option value="scheduled">Scheduled</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                        <span class="result-count" id="event-count"></span>
+                    </div>
+                    <div class="card-body" style="padding:0">
+                        <table>
+                            <thead>
+                                <tr><th>Event</th><th>Date</th><th>Type</th><th>Venue</th><th>Status</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="events-tbody">
+                                <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DEPARTMENT INSPECTOR VISITATIONS -->
+            <div class="section" id="sec-inspections">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🕵️ Department Inspector Visitation</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openModal('inspection')">+ Log Visitation</button>
+                    </div>
+                    <div class="search-bar">
+                        <input id="inspection-search" placeholder="🔍 Search by department, inspector, findings or date…" oninput="filterInspections()">
+                        <select id="inspection-status-filter" onchange="filterInspections()">
+                            <option value="">All statuses</option>
+                            <option value="compliant">Compliant</option>
+                            <option value="follow-up">Follow-up</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                        <span class="result-count" id="inspection-count"></span>
+                    </div>
+                    <div class="card-body" style="padding:0">
+                        <table>
+                            <thead>
+                                <tr><th>Department</th><th>Inspector</th><th>Visit Date</th><th>Status</th><th>Findings</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="inspections-tbody">
+                                <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1254,6 +1324,8 @@
     <div class="modal">
         <h3>✅ Add Task</h3>
         <div class="form-group"><label>Description</label><input id="t-desc" placeholder="Task description"></div>
+        <div class="form-group"><label>Assigned To</label><input id="t-assignee" placeholder="Who will handle this task?"></div>
+        <div class="form-group"><label>Due Date</label><input id="t-due-date" type="date"></div>
         <div class="form-group">
             <label>Priority</label>
             <select id="t-priority">
@@ -1262,10 +1334,62 @@
                 <option value="low">Low</option>
             </select>
         </div>
+        <div class="form-group"><label>Notes</label><textarea id="t-notes" placeholder="Add notes, instructions, or follow-up details"></textarea></div>
         <div class="modal-msg" id="modal-task-msg"></div>
         <div class="modal-footer">
             <button class="btn btn-ghost" onclick="closeModal('task')">Cancel</button>
             <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+        </div>
+    </div>
+</div>
+
+<!-- Event modal -->
+<div class="modal-overlay" id="modal-event" hidden>
+    <div class="modal">
+        <h3>📅 Add Event</h3>
+        <div class="form-group"><label>Event Name</label><input id="ev-title" placeholder="e.g. Family Day"></div>
+        <div class="form-group"><label>Event Date</label><input id="ev-date" type="date"></div>
+        <div class="form-group"><label>Event Type</label><input id="ev-type" placeholder="e.g. Community, Wellness, Celebration"></div>
+        <div class="form-group"><label>Venue</label><input id="ev-venue" placeholder="Where will it take place?"></div>
+        <div class="form-group"><label>Coordinator</label><input id="ev-coordinator" placeholder="Person responsible"></div>
+        <div class="form-group">
+            <label>Status</label>
+            <select id="ev-status">
+                <option value="scheduled">Scheduled</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea id="ev-notes" placeholder="Agenda, guests, transport, or preparation notes"></textarea></div>
+        <div class="modal-msg" id="modal-event-msg"></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('event')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveEvent()">Save Event</button>
+        </div>
+    </div>
+</div>
+
+<!-- Inspection modal -->
+<div class="modal-overlay" id="modal-inspection" hidden>
+    <div class="modal">
+        <h3>🕵️ Log Department Inspector Visitation</h3>
+        <div class="form-group"><label>Department</label><input id="insp-department" placeholder="Department or area inspected"></div>
+        <div class="form-group"><label>Inspector Name</label><input id="insp-inspector" placeholder="Inspector name"></div>
+        <div class="form-group"><label>Visit Date</label><input id="insp-date" type="date"></div>
+        <div class="form-group">
+            <label>Status</label>
+            <select id="insp-status">
+                <option value="compliant">Compliant</option>
+                <option value="follow-up">Follow-up</option>
+                <option value="critical">Critical</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Findings</label><textarea id="insp-findings" placeholder="What did the inspector observe?"></textarea></div>
+        <div class="form-group"><label>Recommendations</label><textarea id="insp-recommendations" placeholder="Required actions or recommendations"></textarea></div>
+        <div class="modal-msg" id="modal-inspection-msg"></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('inspection')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveInspection()">Save Visitation</button>
         </div>
     </div>
 </div>
@@ -1522,6 +1646,9 @@ let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
+let tasksAll       = [];    // full task rows for client-side filtering
+let eventsAll      = [];    // full event rows for client-side filtering
+let inspectionsAll = [];    // full inspection rows for client-side filtering
 let editingUserId  = null;
 const PROFILE_LOAD_RETRY_DELAY_MS = 300;
 const STAFF_DIRECTORY_COLLECTION = 'staffDirectory';
@@ -1726,10 +1853,11 @@ function statusBadge(s) {
         active: 'badge-green', critical: 'badge-red', stable: 'badge-blue',
         discharged: 'badge-gray', pending: 'badge-amber',
         approved: 'badge-green', denied: 'badge-red', paid: 'badge-green',
-        completed: 'badge-green', 'in-progress': 'badge-blue'
+        completed: 'badge-green', 'in-progress': 'badge-blue', scheduled: 'badge-purple',
+        compliant: 'badge-green', 'follow-up': 'badge-amber'
     };
     const cls = map[s] || 'badge-gray';
-    return `<span class="badge ${cls}">${s}</span>`;
+    return `<span class="badge ${cls}">${escapeHTML(s || '—')}</span>`;
 }
 
 function roleBadgeHTML(role) {
@@ -1916,6 +2044,8 @@ const NAV_ITEMS = [
     { id: 'dashboard',   icon: '📊', label: 'Dashboard',        roles: ['admin','staff','doctor'] },
     { id: 'residents',    icon: '🧓', label: 'Residents',        roles: ['admin','staff','doctor'] },
     { id: 'tasks',       icon: '✅', label: 'Tasks',             roles: ['admin','staff','doctor'] },
+    { id: 'events',      icon: '📅', label: 'Events Management', roles: ['admin','staff','doctor'] },
+    { id: 'inspections', icon: '🕵️', label: 'Inspector Visits',  roles: ['admin','staff','doctor'] },
     { id: 'medications', icon: '💊', label: 'Medications',       roles: ['admin','staff','doctor'] },
     { id: 'leaves',      icon: '🗓️', label: 'Leave Requests',    roles: ['admin','staff','doctor'] },
     { id: 'users',       icon: '👥', label: 'Admin Workspace',   roles: ['admin'] },
@@ -2155,13 +2285,15 @@ window.navigateTo = function(id) {
     if (navEl) navEl.classList.add('active');
 
     const labels = { dashboard:'Dashboard', residents:'Residents', users:'Admin Workspace',
-                     tasks:'Tasks', medications:'Medications', finance:'Finance',
+                     tasks:'Tasks', events:'Events Management', inspections:'Department Inspector Visitation', medications:'Medications', finance:'Finance',
                      leaves:'Leave Requests', activities:'Audit Log' };
     const subtitles = {
         dashboard: 'Track residents, staffing, and home operations in one place.',
         residents: 'Review resident wellbeing, room details, and care status updates.',
         users: 'Manage the staff directory and jump into finance or audit reviews from one place.',
         tasks: 'Monitor assignments, priority items, and operational progress.',
+        events: 'Plan house events, keep dates visible, and coordinate responsibilities in one workspace.',
+        inspections: 'Log inspector visitations, findings, and compliance follow-up for each department.',
         medications: 'Keep medication schedules and treatment records easy to review.',
         finance: 'Manage donations, income, and expenditure with a clearer overview.',
         leaves: 'Follow leave requests and staffing availability without switching context.',
@@ -2183,6 +2315,8 @@ function loadSection(id) {
         case 'residents':    loadResidents();    break;
         case 'users':       loadUsers();       break;
         case 'tasks':       loadTasks();       break;
+        case 'events':      loadEvents();      break;
+        case 'inspections': loadInspections(); break;
         case 'medications': loadMedications(); break;
         case 'finance':     loadFinance();     break;
         case 'leaves':      loadLeaves();      break;
@@ -2652,41 +2786,100 @@ window.editUser = function(id) {
 // ── Tasks ─────────────────────────────────────────────────────────────
 async function loadTasks() {
     const tb = document.getElementById('tasks-tbody');
-    tb.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
         const snap = await getDocs(collection(db, 'tasks'));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="4"><div class="empty"><div class="e-icon">✅</div><p>No tasks found.</p></div></td></tr>';
-            return;
-        }
-        const role = getCurrentUserRole();
-        tb.innerHTML = snap.docs.map(d => {
-            const t = d.data();
-            const pri = { high: 'badge-red', medium: 'badge-amber', low: 'badge-blue' };
-            const priBadge = `<span class="badge ${pri[t.priority] || 'badge-gray'}">${t.priority || '—'}</span>`;
-            let actions = '';
-            if (t.status !== 'completed') {
-                actions += `<button class="btn btn-ghost btn-sm" onclick="completeTask('${d.id}')">✔ Done</button> `;
-            }
-            if (role === 'admin') {
-                actions += `<button class="btn btn-ghost btn-sm" onclick="deleteTask('${d.id}')">🗑</button>`;
-            }
-            return `<tr>
-                <td>${t.desc || '—'}</td>
-                <td>${priBadge}</td>
-                <td>${statusBadge(t.status || 'pending')}</td>
-                <td>${actions || '—'}</td>
-            </tr>`;
-        }).join('');
+        tasksAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => {
+                const aOpen = (a.status || 'pending') === 'completed' ? 1 : 0;
+                const bOpen = (b.status || 'pending') === 'completed' ? 1 : 0;
+                if (aOpen !== bOpen) return aOpen - bOpen;
+                const dueDiff = timestampToMillis(a.dueDate) - timestampToMillis(b.dueDate);
+                if (dueDiff !== 0) return dueDiff;
+                return getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a);
+            });
+        filterTasks();
     } catch (e) {
-        tb.innerHTML = `<tr><td colspan="4"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        tasksAll = [];
+        tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
     }
 }
 
+window.filterTasks = function() {
+    const tb = document.getElementById('tasks-tbody');
+    const search = (document.getElementById('task-search')?.value || '').toLowerCase();
+    const status = document.getElementById('task-status-filter')?.value || '';
+    const cntEl = document.getElementById('task-count');
+    const role = getCurrentUserRole();
+
+    if (tasksAll.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">✅</div><p>No tasks found.</p></div></td></tr>';
+        if (cntEl) cntEl.textContent = '';
+        return;
+    }
+
+    const filtered = tasksAll.filter(task => {
+        const query = [
+            task.desc,
+            task.assignedTo,
+            task.dueDate,
+            task.notes,
+            task.priority,
+            task.status
+        ].join(' ').toLowerCase();
+        const matchesSearch = !search || query.includes(search);
+        const matchesStatus = !status || (task.status || 'pending') === status;
+        return matchesSearch && matchesStatus;
+    });
+
+    if (cntEl) cntEl.textContent = filtered.length !== tasksAll.length ? `${filtered.length} of ${tasksAll.length}` : `${tasksAll.length} tasks`;
+
+    if (filtered.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔍</div><p>No tasks match your filter.</p></div></td></tr>';
+        return;
+    }
+
+    tb.innerHTML = filtered.map(task => {
+        const safeId = escapeHTML(task.id || '');
+        const safeDesc = escapeHTML(task.desc || '—');
+        const safeAssigned = escapeHTML(task.assignedTo || 'Unassigned');
+        const safeNotes = escapeHTML(task.notes || '');
+        const pri = { high: 'badge-red', medium: 'badge-amber', low: 'badge-blue' };
+        const priBadge = `<span class="badge ${pri[task.priority] || 'badge-gray'}">${escapeHTML(task.priority || '—')}</span>`;
+        const dueText = task.dueDate ? escapeHTML(fmtDate(task.dueDate)) : 'No due date';
+        let actions = '';
+        if ((task.status || 'pending') === 'pending') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="updateTaskStatus('${safeId}','in-progress')">▶ Start</button>`;
+        }
+        if ((task.status || 'pending') !== 'completed') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="updateTaskStatus('${safeId}','completed')">✔ Done</button>`;
+        }
+        if (role === 'admin') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="deleteTask('${safeId}')">🗑</button>`;
+        }
+        return `<tr>
+            <td><strong>${safeDesc}</strong>${safeNotes ? `<div class="field-help">${safeNotes}</div>` : ''}</td>
+            <td>${safeAssigned}</td>
+            <td>${dueText}</td>
+            <td>${priBadge}</td>
+            <td>${statusBadge(task.status || 'pending')}</td>
+            <td><div class="table-actions">${actions || '—'}</div></td>
+        </tr>`;
+    }).join('');
+};
+
 async function completeTask(id) {
+    await updateTaskStatus(id, 'completed');
+}
+
+async function updateTaskStatus(id, status) {
     try {
-        await updateDoc(doc(db, 'tasks', id), { status: 'completed' });
-        toast('Task marked as completed.');
+        await updateDoc(doc(db, 'tasks', id), {
+            status,
+            updatedAt: serverTimestamp(),
+            ...(status === 'completed' ? { completedAt: serverTimestamp() } : {})
+        });
+        toast(status === 'completed' ? 'Task marked as completed.' : 'Task moved into progress.');
         loadTasks();
     } catch (e) { toast('Error: ' + e.message); }
 }
@@ -2697,6 +2890,182 @@ async function deleteTask(id) {
         await deleteDoc(doc(db, 'tasks', id));
         toast('Task deleted.');
         loadTasks();
+    } catch (e) { toast('Error: ' + e.message); }
+}
+
+// ── Events ────────────────────────────────────────────────────────────
+async function loadEvents() {
+    const tb = document.getElementById('events-tbody');
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
+    try {
+        const snap = await getDocs(collection(db, 'events'));
+        eventsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => timestampToMillis(a.date) - timestampToMillis(b.date) || getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a));
+        filterEvents();
+    } catch (e) {
+        eventsAll = [];
+        tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+    }
+}
+
+window.filterEvents = function() {
+    const tb = document.getElementById('events-tbody');
+    const search = (document.getElementById('event-search')?.value || '').toLowerCase();
+    const status = document.getElementById('event-status-filter')?.value || '';
+    const cntEl = document.getElementById('event-count');
+    const role = getCurrentUserRole();
+
+    if (eventsAll.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">📅</div><p>No events recorded yet.</p></div></td></tr>';
+        if (cntEl) cntEl.textContent = '';
+        return;
+    }
+
+    const filtered = eventsAll.filter(event => {
+        const query = [
+            event.title,
+            event.type,
+            event.venue,
+            event.coordinator,
+            event.notes,
+            event.date,
+            event.status
+        ].join(' ').toLowerCase();
+        const matchesSearch = !search || query.includes(search);
+        const matchesStatus = !status || (event.status || 'scheduled') === status;
+        return matchesSearch && matchesStatus;
+    });
+
+    if (cntEl) cntEl.textContent = filtered.length !== eventsAll.length ? `${filtered.length} of ${eventsAll.length}` : `${eventsAll.length} events`;
+
+    if (filtered.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔍</div><p>No events match your filter.</p></div></td></tr>';
+        return;
+    }
+
+    tb.innerHTML = filtered.map(event => {
+        const safeId = escapeHTML(event.id || '');
+        const safeTitle = escapeHTML(event.title || '—');
+        const safeType = escapeHTML(event.type || '—');
+        const safeVenue = escapeHTML(event.venue || '—');
+        const safeCoordinator = escapeHTML(event.coordinator || '');
+        let actions = '';
+        if ((event.status || 'scheduled') === 'scheduled') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="updateEventStatus('${safeId}','in-progress')">▶ Start</button>`;
+        }
+        if ((event.status || 'scheduled') !== 'completed') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="updateEventStatus('${safeId}','completed')">✔ Close</button>`;
+        }
+        if (role === 'admin') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="deleteEvent('${safeId}')">🗑</button>`;
+        }
+        return `<tr>
+            <td><strong>${safeTitle}</strong>${safeCoordinator ? `<div class="field-help">Coordinator: ${safeCoordinator}</div>` : ''}</td>
+            <td>${escapeHTML(fmtDate(event.date))}</td>
+            <td>${safeType}</td>
+            <td>${safeVenue}</td>
+            <td>${statusBadge(event.status || 'scheduled')}</td>
+            <td><div class="table-actions">${actions || '—'}</div></td>
+        </tr>`;
+    }).join('');
+};
+
+async function updateEventStatus(id, status) {
+    try {
+        await updateDoc(doc(db, 'events', id), {
+            status,
+            updatedAt: serverTimestamp()
+        });
+        toast(status === 'completed' ? 'Event marked as completed.' : 'Event moved into progress.');
+        loadEvents();
+    } catch (e) { toast('Error: ' + e.message); }
+}
+
+async function deleteEvent(id) {
+    if (!confirm('Delete this event?')) return;
+    try {
+        await deleteDoc(doc(db, 'events', id));
+        toast('Event deleted.');
+        loadEvents();
+    } catch (e) { toast('Error: ' + e.message); }
+}
+
+// ── Inspections ───────────────────────────────────────────────────────
+async function loadInspections() {
+    const tb = document.getElementById('inspections-tbody');
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
+    try {
+        const snap = await getDocs(collection(db, 'inspections'));
+        inspectionsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => timestampToMillis(b.date) - timestampToMillis(a.date) || getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a));
+        filterInspections();
+    } catch (e) {
+        inspectionsAll = [];
+        tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+    }
+}
+
+window.filterInspections = function() {
+    const tb = document.getElementById('inspections-tbody');
+    const search = (document.getElementById('inspection-search')?.value || '').toLowerCase();
+    const status = document.getElementById('inspection-status-filter')?.value || '';
+    const cntEl = document.getElementById('inspection-count');
+    const role = getCurrentUserRole();
+
+    if (inspectionsAll.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🕵️</div><p>No department inspector visitations recorded yet.</p></div></td></tr>';
+        if (cntEl) cntEl.textContent = '';
+        return;
+    }
+
+    const filtered = inspectionsAll.filter(inspection => {
+        const query = [
+            inspection.department,
+            inspection.inspector,
+            inspection.findings,
+            inspection.recommendations,
+            inspection.date,
+            inspection.status
+        ].join(' ').toLowerCase();
+        const matchesSearch = !search || query.includes(search);
+        const matchesStatus = !status || (inspection.status || 'compliant') === status;
+        return matchesSearch && matchesStatus;
+    });
+
+    if (cntEl) cntEl.textContent = filtered.length !== inspectionsAll.length ? `${filtered.length} of ${inspectionsAll.length}` : `${inspectionsAll.length} visitations`;
+
+    if (filtered.length === 0) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔍</div><p>No visitations match your filter.</p></div></td></tr>';
+        return;
+    }
+
+    tb.innerHTML = filtered.map(inspection => {
+        const safeId = escapeHTML(inspection.id || '');
+        const safeDepartment = escapeHTML(inspection.department || '—');
+        const safeInspector = escapeHTML(inspection.inspector || '—');
+        const safeFindings = escapeHTML(inspection.findings || '—');
+        const safeRecommendations = escapeHTML(inspection.recommendations || '');
+        let actions = '';
+        if (role === 'admin') {
+            actions += `<button class="btn btn-ghost btn-sm" onclick="deleteInspection('${safeId}')">🗑</button>`;
+        }
+        return `<tr>
+            <td><strong>${safeDepartment}</strong>${safeRecommendations ? `<div class="field-help">${safeRecommendations}</div>` : ''}</td>
+            <td>${safeInspector}</td>
+            <td>${escapeHTML(fmtDate(inspection.date))}</td>
+            <td>${statusBadge(inspection.status || 'compliant')}</td>
+            <td>${safeFindings}</td>
+            <td><div class="table-actions">${actions || '—'}</div></td>
+        </tr>`;
+    }).join('');
+};
+
+async function deleteInspection(id) {
+    if (!confirm('Delete this visitation record?')) return;
+    try {
+        await deleteDoc(doc(db, 'inspections', id));
+        toast('Visitation deleted.');
+        loadInspections();
     } catch (e) { toast('Error: ' + e.message); }
 }
 
@@ -2994,18 +3363,89 @@ window.saveUser = async function() {
 // ── Save Task ────────────────────────────────────────────────────────────
 window.saveTask = async function() {
     const desc     = document.getElementById('t-desc').value.trim();
+    const assignedTo = document.getElementById('t-assignee').value.trim();
+    const dueDate  = document.getElementById('t-due-date').value;
     const priority = document.getElementById('t-priority').value;
+    const notes    = document.getElementById('t-notes').value.trim();
     if (!desc) { modalMsg('task', 'Description is required.', 'error'); return; }
     try {
         await addDoc(collection(db, 'tasks'), {
-            desc, priority, status: 'pending',
-            createdBy: currentUser.uid, createdAt: serverTimestamp()
+            desc,
+            assignedTo,
+            dueDate,
+            priority,
+            notes,
+            status: 'pending',
+            createdBy: currentUser.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
         });
         await logActivity(`Task created: "${desc}" (${priority} priority)`);
         closeModal('task');
         toast('Task created.');
         loadTasks();
     } catch (e) { modalMsg('task', 'Error: ' + e.message, 'error'); }
+};
+
+// ── Save Event ─────────────────────────────────────────────────────────
+window.saveEvent = async function() {
+    const title = document.getElementById('ev-title').value.trim();
+    const date = document.getElementById('ev-date').value;
+    const type = document.getElementById('ev-type').value.trim();
+    const venue = document.getElementById('ev-venue').value.trim();
+    const coordinator = document.getElementById('ev-coordinator').value.trim();
+    const status = document.getElementById('ev-status').value;
+    const notes = document.getElementById('ev-notes').value.trim();
+    if (!title || !date) { modalMsg('event', 'Event name and date are required.', 'error'); return; }
+    try {
+        await addDoc(collection(db, 'events'), {
+            title,
+            date,
+            type,
+            venue,
+            coordinator,
+            status,
+            notes,
+            createdBy: currentUser.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        await logActivity(`Event created: ${title}`);
+        closeModal('event');
+        toast('Event saved.');
+        loadEvents();
+    } catch (e) { modalMsg('event', 'Error: ' + e.message, 'error'); }
+};
+
+// ── Save Inspection ────────────────────────────────────────────────────
+window.saveInspection = async function() {
+    const department = document.getElementById('insp-department').value.trim();
+    const inspector = document.getElementById('insp-inspector').value.trim();
+    const date = document.getElementById('insp-date').value;
+    const status = document.getElementById('insp-status').value;
+    const findings = document.getElementById('insp-findings').value.trim();
+    const recommendations = document.getElementById('insp-recommendations').value.trim();
+    if (!department || !inspector || !date || !findings) {
+        modalMsg('inspection', 'Department, inspector, visit date, and findings are required.', 'error');
+        return;
+    }
+    try {
+        await addDoc(collection(db, 'inspections'), {
+            department,
+            inspector,
+            date,
+            status,
+            findings,
+            recommendations,
+            createdBy: currentUser.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        await logActivity(`Inspector visitation logged: ${department} (${inspector})`);
+        closeModal('inspection');
+        toast('Visitation saved.');
+        loadInspections();
+    } catch (e) { modalMsg('inspection', 'Error: ' + e.message, 'error'); }
 };
 
 // ── Save Medication ──────────────────────────────────────────────────────
@@ -3098,6 +3538,10 @@ window.saveLeave = async function() {
 window.deleteResident    = deleteResident;
 window.completeTask     = completeTask;
 window.deleteTask       = deleteTask;
+window.updateTaskStatus = updateTaskStatus;
+window.updateEventStatus = updateEventStatus;
+window.deleteEvent      = deleteEvent;
+window.deleteInspection = deleteInspection;
 window.deleteUserEntry  = deleteUserEntry;
 window.approveLeave     = approveLeave;
 window.denyLeave        = denyLeave;
