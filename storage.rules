@@ -3,7 +3,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     function authEmail() {
       return request.auth != null && request.auth.token.email != null
-        ? request.auth.token.email
+        ? request.auth.token.email.lower()
         : '';
     }
 
