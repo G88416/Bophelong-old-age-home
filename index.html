@@ -1947,6 +1947,15 @@ const NAV_ITEMS = [
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
 
+function canAccessWorkspace(id, role = getCurrentUserRole()) {
+    const navItem = NAV_ITEMS.find(item => item.id === id);
+    return !!navItem && (!Array.isArray(navItem.roles) || navItem.roles.includes(role));
+}
+
+function getWorkspaceLabel(id) {
+    return NAV_ITEMS.find(item => item.id === id)?.label || id;
+}
+
 const ORB_ACTIONS = [
     { modal: 'resident',   label: '+ Resident',   ariaLabel: 'Add resident',       angle: -15 },
     { modal: 'task',       label: '+ Task',       ariaLabel: 'Add task',           angle: -55 },
@@ -2153,6 +2162,11 @@ window.toggleOrbMenu = function(forceState) {
 };
 
 window.navigateTo = function(id) {
+    const requestedId = id;
+    if (!canAccessWorkspace(requestedId)) {
+        toast(`Only admins can access the ${getWorkspaceLabel(requestedId)} workspace.`);
+        id = getDefaultWorkspaceForProfile(currentProfile);
+    }
     // Hide all sections
     document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -2448,6 +2462,11 @@ async function deleteResident(id) {
 // ── Users ─────────────────────────────────────────────────────────────
 async function loadUsers() {
     const tb = document.getElementById('users-tbody');
+    if (getCurrentUserRole() !== 'admin') {
+        usersAll = [];
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔒</div><p>Only admins can manage staff and user accounts.</p></div></td></tr>';
+        return;
+    }
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
         const snap = await getDocs(collection(db, 'users'));
@@ -2590,6 +2609,10 @@ window.filterUsers = function() {
 };
 
 async function toggleUserActive(id, current) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can change user access.');
+        return;
+    }
     try {
         await updateDoc(doc(db, 'users', id), { active: !current });
         await logActivity(`User ${current ? 'deactivated' : 'activated'} (id: ${id})`);
@@ -2646,6 +2669,10 @@ function configureUserModal(mode = 'create', user = null) {
 }
 
 window.editUser = function(id) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can edit user profiles.');
+        return;
+    }
     const user = usersAll.find(u => u._docId === id);
     if (!user) {
         toast('Unable to find that user profile.');
@@ -2888,6 +2915,10 @@ async function loadActivities() {
 
 // ── Modals ──────────────────────────────────────────────────────────────
 window.openModal  = function(name) {
+    if (name === 'user' && getCurrentUserRole() !== 'admin') {
+        toast('Only admins can manage user accounts.');
+        return;
+    }
     document.getElementById('modal-' + name).removeAttribute('hidden');
     // Reset user form fields each time the modal is opened
     if (name === 'user') {
@@ -2929,6 +2960,10 @@ window.saveResident = async function() {
 
 // ── Save User ────────────────────────────────────────────────────────────
 window.saveUser = async function() {
+    if (getCurrentUserRole() !== 'admin') {
+        modalMsg('user', 'Only admins can manage user accounts.', 'error');
+        return;
+    }
     const name     = document.getElementById('u-name').value.trim();
     const email    = normalizeEmail(document.getElementById('u-email').value);
     const dept     = document.getElementById('u-dept').value.trim();
