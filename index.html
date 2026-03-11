@@ -2802,7 +2802,7 @@ async function loadDashboardStats() {
                         }).join('') +
                         `</tbody></table>`;
                 }
-            } catch (_) { /* activities may be empty */ }
+            } catch (_) { /* ignore activity query errors */ }
         }
 
     } catch (e) {
