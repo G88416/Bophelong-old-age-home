@@ -2055,6 +2055,10 @@ function normalizeEmail(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
 function escapeHTML(value) {
     return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -4542,7 +4546,11 @@ window.saveFunder = async function() {
     const status = document.getElementById('f-status').value;
     const notes = document.getElementById('f-notes').value.trim();
     if (!name || !contactPerson || (!email && !phone)) {
-        modalMsg('funder', 'Funder name, contact person, and at least one contact detail are required.', 'error');
+        modalMsg('funder', 'Funder name, contact person, and at least one contact detail (email or phone) are required.', 'error');
+        return;
+    }
+    if (email && !isValidEmail(email)) {
+        modalMsg('funder', 'Enter a valid email address or leave the email field blank.', 'error');
         return;
     }
     try {
