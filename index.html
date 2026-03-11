@@ -1069,7 +1069,7 @@
                             </div>
                             <div class="inline-actions" style="margin-top:16px;">
                                 <button class="btn btn-primary btn-sm" onclick="openModal('user')">+ Add Staff</button>
-                                <button class="btn btn-ghost btn-sm" onclick="navigateTo('settings')">⚙️ Open Settings</button>
+                                <button class="btn btn-ghost btn-sm" onclick="navigateTo('settings')" aria-label="Open Admin Settings">⚙️ Open Admin Settings</button>
                                 <button class="btn btn-ghost btn-sm" onclick="navigateTo('finance')">💰 Open Finance</button>
                                 <button class="btn btn-ghost btn-sm" onclick="navigateTo('activities')">📜 View Audit Log</button>
                                 <button class="btn btn-ghost btn-sm" onclick="loadUsers()">🔄 Refresh Staff Directory</button>
@@ -1733,7 +1733,7 @@
 
 <!-- ═══════════════ FIREBASE + APP LOGIC ═══════════════ -->
 <script type="module">
-import { initializeApp, getApp, deleteApp }
+import { initializeApp, deleteApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
@@ -2103,7 +2103,7 @@ function pickBestProfileMatch(user, docs = []) {
 function getProfileAccessErrorMessage(error) {
     const code = normalizeFirebaseErrorCode(error && error.code);
     if (!navigator.onLine) return 'You are offline. Reconnect to the internet and retry.';
-    if (code === 'no-profile') return 'Your sign-in succeeded, but no active user profile is linked to this account. Please contact an admin.';
+    if (code === 'no-profile') return 'Your sign-in succeeded, but no user profile is linked to this account. Please contact an admin.';
     if (code === 'inactive') return 'This user profile is inactive. Please contact an admin for access.';
     if (code === 'unavailable' || code === 'deadline-exceeded') return 'We could not reach the server. Please retry in a moment.';
     if (code === 'permission-denied') return 'Your sign-in succeeded, but the app data could not be opened right now. Please retry in a moment.';
@@ -2257,7 +2257,7 @@ async function loadProfile(user) {
                     qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
                 }
                 if (qs.empty) {
-                    const profileError = new Error('No active profile found for this account.');
+                    const profileError = new Error('No user profile is linked to this account. Please contact an administrator to set up your profile.');
                     profileError.code = 'no-profile';
                     throw profileError;
                 }
@@ -3052,9 +3052,10 @@ function renderWorkRoster(staffRows = [], rosterRows = [], leaveRows = [], error
             ${weekDates.map(date => {
                 const day = formatDateInputValue(date);
                 const rosterEntry = rosterMap.get(`${staffEmail}|${day}`);
-                const leaveEntry = approvedLeaves.find(leave => normalizeEmail(leave.resolvedStaffEmail || leave.staffEmail || leave.email || leave.staffMemberEmail || '') === staffEmail
-                    ? isDateWithinRange(day, coerceDate(leave.startDate), coerceDate(leave.endDate))
-                    : false);
+                const leaveEntry = approvedLeaves.find(leave =>
+                    normalizeEmail(leave.resolvedStaffEmail || leave.staffEmail || leave.email || leave.staffMemberEmail || '') === staffEmail
+                    && isDateWithinRange(day, coerceDate(leave.startDate), coerceDate(leave.endDate))
+                );
                 if (leaveEntry) {
                     return `<td class="roster-cell">${statusBadge('approved')}<span class="roster-meta">On approved leave</span></td>`;
                 }
@@ -3517,6 +3518,7 @@ async function generateAdvancedReport() {
             const expenditure = expenditureSnap.docs.map(docSnap => docSnap.data() || {}).filter(entry => !entry.date || isDateWithinRange(entry.date, startDate, endDate));
             const totalIncome = income.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
             const totalExpenditure = expenditure.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+            const paidExpenditureCount = expenditure.filter(entry => String(entry.status || '').toLowerCase() === 'paid').length;
             stats = [
                 { label: 'Donations', value: donations.length },
                 { label: 'Income', value: formatCurrency(totalIncome) },
@@ -3526,7 +3528,7 @@ async function generateAdvancedReport() {
             notes = [
                 `${donations.filter(entry => ['monetary', 'grant'].includes(String(entry.type || '').toLowerCase())).length} donation record(s) are financial contributions.`,
                 `${income.filter(entry => String(entry.category || '').toLowerCase() === 'subsidy').length} income record(s) were captured as subsidies.`,
-                `${expenditure.filter(entry => String(entry.status || '').toLowerCase() === 'paid').length} expenditure item(s) are already paid.`,
+                `${paidExpenditureCount} expenditure item${paidExpenditureCount === 1 ? '' : 's'} ${paidExpenditureCount === 1 ? 'is' : 'are'} already paid.`,
                 `The current report window covers ${income.length + expenditure.length + donations.length} finance record(s).`
             ];
         }
@@ -3603,7 +3605,7 @@ function configureManagedUserModal(mode = 'create', user = null) {
 }
 
 async function withSecondaryUserAuth(action) {
-    const appName = `bophelong-user-admin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const appName = `bophelong-user-admin-${typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}`;
     const secondaryApp = initializeApp(firebaseConfig, appName);
     const secondaryAuth = getAuth(secondaryApp);
     try {
