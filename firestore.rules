@@ -205,6 +205,42 @@ service cloud.firestore {
         && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
     }
 
+    function isValidFunderType(fundingType) {
+      return fundingType == 'grant'
+        || fundingType == 'corporate'
+        || fundingType == 'government'
+        || fundingType == 'individual'
+        || fundingType == 'in-kind';
+    }
+
+    function isValidEmailAddress(value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 320
+        && value.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
+    }
+
+    function isFunderPayload(data) {
+      return data.keys().hasAll(['name', 'contactPerson', 'fundingType', 'status'])
+        && data.keys().hasOnly(['name', 'contactPerson', 'email', 'phone', 'fundingType', 'status', 'notes', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 200
+        && data.contactPerson is string
+        && data.contactPerson.size() > 0
+        && data.contactPerson.size() <= 200
+        && (!data.keys().hasAll(['email']) || isValidEmailAddress(data.email))
+        && (!data.keys().hasAll(['phone']) || (data.phone is string && data.phone.size() > 0 && data.phone.size() <= 50))
+        && (data.keys().hasAll(['email']) || data.keys().hasAll(['phone']))
+        && data.fundingType is string
+        && isValidFunderType(data.fundingType)
+        && data.status is string
+        && (data.status == 'active' || data.status == 'inactive')
+        && (!data.keys().hasAll(['notes']) || (data.notes is string && data.notes.size() <= 2000))
+        && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
+        && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
     function isEventPayload(data) {
       return data.keys().hasAll(['title', 'date', 'status', 'createdBy'])
         && data.keys().hasOnly(['title', 'date', 'type', 'venue', 'coordinator', 'status', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
@@ -288,6 +324,13 @@ service cloud.firestore {
 
     match /expenditure/{docId} {
       allow read, write: if isAdmin();
+    }
+
+    match /funders/{docId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && isFunderPayload(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /leaves/{leaveId} {
