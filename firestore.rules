@@ -293,9 +293,12 @@ service cloud.firestore {
     match /leaves/{leaveId} {
       allow read: if isAdmin()
         || (hasAppAccess() && resource != null && resource.data.staffUid == request.auth.uid);
-      allow create: if hasAppAccess()
-        && hasStaffUid(request.resource.data)
-        && request.resource.data.staffUid == request.auth.uid;
+      allow create: if (isAdmin()
+          || (
+            hasAppAccess()
+            && hasStaffUid(request.resource.data)
+            && request.resource.data.staffUid == request.auth.uid
+          ));
       allow update: if isAdmin()
         && hasStaffUid(resource.data)
         && hasStaffUid(request.resource.data)
