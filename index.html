@@ -2789,20 +2789,21 @@ async function loadDashboardStats() {
             `;
 
         // Recent activity
-        try {
-            const aSnap = await getDocs(query(collection(db, 'activities'), orderBy('date', 'desc'), limit(10)));
-            const tb = document.getElementById('recent-activity');
-            if (aSnap.empty) {
-                tb.innerHTML = '<div class="empty"><div class="e-icon">📭</div><p>No recent activity.</p></div>';
-            } else {
-                tb.innerHTML = `<table><thead><tr><th>Message</th><th>Date</th></tr></thead><tbody>` +
-                    aSnap.docs.map(d => {
-                        const data = d.data();
-                        return `<tr><td>${data.msg || '—'}</td><td>${fmtDate(data.date)}</td></tr>`;
-                    }).join('') +
-                    `</tbody></table>`;
-            }
-        } catch (_) { /* activities may be empty */ }
+        const tb = document.getElementById('recent-activity');
+        tb.innerHTML = '<div class="empty"><div class="e-icon">📭</div><p>No recent activity.</p></div>';
+        if (role === 'admin') {
+            try {
+                const aSnap = await getDocs(query(collection(db, 'activities'), orderBy('date', 'desc'), limit(10)));
+                if (!aSnap.empty) {
+                    tb.innerHTML = `<table><thead><tr><th>Message</th><th>Date</th></tr></thead><tbody>` +
+                        aSnap.docs.map(d => {
+                            const data = d.data();
+                            return `<tr><td>${data.msg || '—'}</td><td>${fmtDate(data.date)}</td></tr>`;
+                        }).join('') +
+                        `</tbody></table>`;
+                }
+            } catch (_) { /* activities may be empty */ }
+        }
 
     } catch (e) {
         console.error('Dashboard load error:', e);
