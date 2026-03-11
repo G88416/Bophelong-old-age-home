@@ -11,9 +11,10 @@ Any valid Firebase email/password account can now sign in even if a matching
 Firestore profile is missing or marked inactive. In those cases the portal opens
 with standard staff access until an administrator assigns an active role profile.
 
-The configured permanent admin account (`admin@oldage.com`) is the exception: it
-always opens the admin workspace after sign-in so the main admin can recover
-access even if the matching Firestore profile still needs to be synchronized.
+The configured permanent admin accounts (`lebo@oldage.co.za` and
+`tebogo@oldage.co.za`) are the exception: they always open the admin workspace
+after sign-in so the main admins can recover access even if the matching
+Firestore profiles still need to be synchronized.
 
 ## Need an account?
 Ask an administrator to create a user account from the **Users** section

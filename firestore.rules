@@ -22,7 +22,10 @@ service cloud.firestore {
 
     function isConfiguredAdmin() {
       return isSignedIn()
-        && authEmail() == 'admin@oldage.com';
+        && (
+          authEmail() == 'lebo@oldage.co.za'
+          || authEmail() == 'tebogo@oldage.co.za'
+        );
     }
 
     function hasAppAccess() {
@@ -55,7 +58,10 @@ service cloud.firestore {
     function isConfiguredAdminBootstrap(userId, data) {
       return isSignedIn()
         && userId == request.auth.uid
-        && authEmail() == 'admin@oldage.com'
+        && (
+          authEmail() == 'lebo@oldage.co.za'
+          || authEmail() == 'tebogo@oldage.co.za'
+        )
         && data.get('email', null) == authEmail()
         && data.get('uid', null) == request.auth.uid
         && data.get('role', '') == 'admin'
@@ -64,7 +70,10 @@ service cloud.firestore {
 
     function isConfiguredAdminUserDoc(userId, data) {
       return data != null
-        && data.get('email', '').lower() == 'admin@oldage.com'
+        && (
+          data.get('email', '').lower() == 'lebo@oldage.co.za'
+          || data.get('email', '').lower() == 'tebogo@oldage.co.za'
+        )
         && data.get('uid', userId) == userId;
     }
 
