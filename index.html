@@ -1765,7 +1765,10 @@ const db   = getFirestore(app);
 // ── CONFIGURED ADMIN ACCESS ───────────────────────────────────────
 const isDevHost = window.location.hostname === 'localhost'
     || window.location.hostname === '127.0.0.1';
-const configuredAdminEmail = normalizeEmail('admin@oldage.com');
+const configuredAdminEmails = [
+    normalizeEmail('lebo@oldage.co.za'),
+    normalizeEmail('tebogo@oldage.co.za')
+];
 const devAdminEmail = 'admin@bophelong.test';
 const devAdminPassword = 'Boph3long-Dev-Only-2026!';
 let devAutoLoginAttempted = false;
@@ -1776,7 +1779,7 @@ const DEFAULT_WORKSPACES = {
 
 function isUserConfiguredAdmin(user) {
     if (!user || !user.email) return false;
-    return normalizeEmail(user.email) === configuredAdminEmail;
+    return configuredAdminEmails.includes(normalizeEmail(user.email));
 }
 
 async function ensureConfiguredAdminProfile(user) {

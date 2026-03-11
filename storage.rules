@@ -8,7 +8,10 @@ service firebase.storage {
     }
 
     function isConfiguredAdmin() {
-      return request.auth != null && authEmail() == 'admin@oldage.com';
+      return request.auth != null && (
+        authEmail() == 'lebo@oldage.co.za'
+        || authEmail() == 'tebogo@oldage.co.za'
+      );
     }
 
     match /users/{userId}/{allPaths=**} {
