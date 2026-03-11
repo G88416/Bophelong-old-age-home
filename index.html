@@ -654,8 +654,61 @@
         .field-help {
             display: block; margin-top: 6px; font-size: .74rem; color: var(--muted); line-height: 1.45;
         }
+        .settings-grid {
+            display: grid; grid-template-columns: 1.1fr .9fr; gap: 20px; margin-bottom: 20px;
+        }
+        .report-builder {
+            display: grid; gap: 14px;
+        }
+        .report-actions {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+        }
+        .report-stat-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 16px;
+        }
+        .report-stat {
+            padding: 14px 16px; border-radius: 18px; border: 1px solid rgba(148, 163, 184, 0.16); background: rgba(248, 250, 252, 0.72);
+        }
+        .report-stat strong {
+            display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px;
+        }
+        .report-stat span {
+            display: block; font-size: 1.2rem; font-weight: 700; color: var(--dark);
+        }
+        .report-notes {
+            display: grid; gap: 10px; margin-top: 16px;
+        }
+        .report-note {
+            padding: 12px 14px; border-radius: 16px; background: rgba(124, 58, 237, 0.06); color: #4c1d95; border: 1px solid rgba(124, 58, 237, 0.12);
+            font-size: .82rem; line-height: 1.45;
+        }
+        .roster-toolbar {
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px;
+        }
+        .roster-toolbar-actions {
+            display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+        }
+        .roster-summary {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;
+        }
+        .roster-summary .admin-list-item {
+            background: rgba(15, 23, 42, 0.03);
+        }
+        .roster-cell {
+            min-width: 148px;
+        }
+        .roster-cell select {
+            width: 100%; padding: 9px 10px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.25); background: #fff; font-size: .78rem;
+        }
+        .roster-cell select:disabled {
+            background: rgba(226, 232, 240, 0.7); color: #64748b; cursor: not-allowed;
+        }
+        .roster-meta {
+            display: block; margin-top: 6px; font-size: .72rem; color: var(--muted);
+        }
         @media (max-width: 900px) {
             .admin-grid { grid-template-columns: 1fr; }
+            .settings-grid { grid-template-columns: 1fr; }
         }
 
         /* ── Password toggle ─────────────────────────────────────── */
@@ -1016,6 +1069,7 @@
                             </div>
                             <div class="inline-actions" style="margin-top:16px;">
                                 <button class="btn btn-primary btn-sm" onclick="openModal('user')">+ Add Staff</button>
+                                <button class="btn btn-ghost btn-sm" onclick="navigateTo('settings')">⚙️ Open Settings</button>
                                 <button class="btn btn-ghost btn-sm" onclick="navigateTo('finance')">💰 Open Finance</button>
                                 <button class="btn btn-ghost btn-sm" onclick="navigateTo('activities')">📜 View Audit Log</button>
                                 <button class="btn btn-ghost btn-sm" onclick="loadUsers()">🔄 Refresh Staff Directory</button>
@@ -1029,6 +1083,42 @@
                                 <div class="e-icon">📇</div>
                                 <p>Loading staff directory summary…</p>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🗂️ Interactive Work Roster</h3>
+                        <button class="btn btn-ghost btn-sm" onclick="loadWorkRoster()">↻ Refresh</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">Plan weekly coverage for the admin workspace. Approved leave automatically blocks roster assignments for those days.</div>
+                        <div class="roster-toolbar">
+                            <div class="roster-toolbar-actions">
+                                <button class="btn btn-ghost btn-sm" onclick="shiftRosterWeek(-7)">← Previous Week</button>
+                                <button class="btn btn-ghost btn-sm" onclick="shiftRosterWeek(7)">Next Week →</button>
+                                <button class="btn btn-ghost btn-sm" onclick="resetRosterWeek()">Today</button>
+                            </div>
+                            <div class="roster-toolbar-actions">
+                                <label for="roster-week-start" style="font-size:.78rem;color:var(--muted);font-weight:600;">Week of</label>
+                                <input id="roster-week-start" type="date" onchange="setRosterWeek(this.value)">
+                            </div>
+                        </div>
+                        <div class="roster-summary" id="work-roster-summary">
+                            <div class="admin-list-item">
+                                <strong>Preparing roster…</strong>
+                                <span>Loading coverage details for this week.</span>
+                            </div>
+                        </div>
+                        <div style="overflow:auto;">
+                            <table>
+                                <thead id="work-roster-head">
+                                    <tr><th>Staff Member</th><th>Week Coverage</th></tr>
+                                </thead>
+                                <tbody id="work-roster-body">
+                                    <tr><td colspan="2"><div class="empty"><div class="e-icon">🗂️</div><p>Loading roster…</p></div></td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1048,6 +1138,85 @@
                             </thead>
                             <tbody id="users-tbody">
                                 <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section" id="sec-settings">
+                <div class="settings-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>⚙️ Settings Module</h3>
+                            <button class="btn btn-ghost btn-sm" onclick="loadSettings()">↻ Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">This settings module is restricted to admins and combines advanced reporting with user access management.</div>
+                            <div class="admin-list" id="settings-module-summary">
+                                <div class="admin-list-item">
+                                    <strong>Loading settings tools…</strong>
+                                    <span>Preparing report templates and access controls.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>👤 User Access Summary</h3></div>
+                        <div class="card-body" id="settings-user-summary">
+                            <div class="empty">
+                                <div class="e-icon">👤</div>
+                                <p>Loading user access insights…</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📊 Advanced Report Generator</h3>
+                        <button class="btn btn-primary btn-sm" onclick="generateAdvancedReport()">Generate Report</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="report-builder">
+                            <div class="search-bar">
+                                <select id="report-type">
+                                    <option value="operations">Operations Overview</option>
+                                    <option value="staffing">Staffing & Leave Coverage</option>
+                                    <option value="finance">Finance Summary</option>
+                                </select>
+                                <input id="report-start-date" type="date" aria-label="Report start date">
+                                <input id="report-end-date" type="date" aria-label="Report end date">
+                                <span class="result-count" id="report-range-note">Choose a date window and template.</span>
+                            </div>
+                            <div class="report-actions">
+                                <button class="btn btn-primary btn-sm" onclick="generateAdvancedReport()">Run analysis</button>
+                                <button class="btn btn-ghost btn-sm" onclick="setDefaultReportDates()">Last 30 days</button>
+                            </div>
+                            <div id="advanced-report-output">
+                                <div class="empty">
+                                    <div class="e-icon">📊</div>
+                                    <p>Generate an admin report to review operations, staffing, or finance trends.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🧑‍💼 User Management</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openModal('managed-user')">+ Add User</button>
+                    </div>
+                    <div class="search-bar">
+                        <input id="managed-user-search" placeholder="🔍 Search by name, email, role, or department…" oninput="filterManagedUsers()">
+                        <span class="result-count" id="managed-user-count"></span>
+                    </div>
+                    <div class="card-body" style="padding:0">
+                        <table>
+                            <thead>
+                                <tr><th>Name</th><th>Role</th><th>Department</th><th>Status</th><th>Email</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="managed-users-tbody">
+                                <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading user access records…</p></div></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1319,6 +1488,49 @@
     </div>
 </div>
 
+<!-- Managed user modal -->
+<div class="modal-overlay" id="modal-managed-user" hidden>
+    <div class="modal">
+        <h3 id="managed-user-modal-title">🧑‍💼 Add User</h3>
+        <div class="alert alert-info" id="managed-user-note">Create a login profile for a staff member. New accounts require a temporary password.</div>
+        <div class="form-group"><label>Full Name *</label><input id="mu-name" placeholder="Full name"></div>
+        <div class="form-group">
+            <label>Email Address *</label>
+            <input id="mu-email" type="email" placeholder="user@example.com">
+            <span class="field-help" id="mu-email-help">The email address becomes the username for app sign-in.</span>
+        </div>
+        <div class="form-group">
+            <label>Role *</label>
+            <select id="mu-role">
+                <option value="staff">Staff</option>
+                <option value="doctor">Doctor</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Department</label><input id="mu-department" placeholder="e.g. Caregiving Ward"></div>
+        <div class="form-group">
+            <label>Status *</label>
+            <select id="mu-active">
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+            </select>
+        </div>
+        <div class="form-group" id="managed-user-password-group">
+            <label>Temporary Password *</label>
+            <div class="pw-wrap">
+                <input id="mu-password" type="password" placeholder="At least 8 characters">
+                <button class="pw-toggle" type="button" onclick="togglePw('mu-password', this)" aria-label="Show password">👁</button>
+            </div>
+            <span class="field-help">Share this password with the user so they can sign in. Password changes are handled in Firebase Authentication.</span>
+        </div>
+        <div class="modal-msg" id="modal-managed-user-msg"></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('managed-user')">Cancel</button>
+            <button class="btn btn-primary" id="save-managed-user-btn" onclick="saveManagedUser()">Create User</button>
+        </div>
+    </div>
+</div>
+
 <!-- Task modal -->
 <div class="modal-overlay" id="modal-task" hidden>
     <div class="modal">
@@ -1521,7 +1733,7 @@
 
 <!-- ═══════════════ FIREBASE + APP LOGIC ═══════════════ -->
 <script type="module">
-import { initializeApp, getApp }
+import { initializeApp, getApp, deleteApp }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
 import { getAnalytics }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-analytics.js";
@@ -1646,13 +1858,24 @@ let currentProfile = null;  // Firestore profile { role, name, … }
 let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
+let managedUsersAll = [];    // full app user rows for settings user management
 let tasksAll       = [];    // full task rows for client-side filtering
 let eventsAll      = [];    // full event rows for client-side filtering
 let inspectionsAll = [];    // full inspection rows for client-side filtering
 let editingUserId  = null;
+let editingManagedUserId = null;
 const PROFILE_LOAD_RETRY_DELAY_MS = 300;
 const STAFF_DIRECTORY_COLLECTION = 'staffDirectory';
+const MANAGED_USER_COLLECTION = 'users';
+const WORK_ROSTER_COLLECTION = 'workRoster';
 const VALID_USER_ROLES = new Set(['admin', 'staff', 'doctor']);
+const ROSTER_SHIFT_OPTIONS = [
+    { value: '', label: 'Unassigned' },
+    { value: 'morning', label: 'Morning Shift' },
+    { value: 'afternoon', label: 'Afternoon Shift' },
+    { value: 'night', label: 'Night Shift' },
+    { value: 'off', label: 'Off Duty' }
+];
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -1693,6 +1916,73 @@ function fmtDate(val) {
 function parseDateInput(value) {
     if (!value) return null;
     return new Date(`${value}T00:00:00`);
+}
+
+function formatDateInputValue(value) {
+    const date = value instanceof Date ? value : parseDateInput(value);
+    if (!date || Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function addDays(value, days) {
+    const date = value instanceof Date ? new Date(value.getTime()) : parseDateInput(value);
+    if (!date || Number.isNaN(date.getTime())) return null;
+    date.setDate(date.getDate() + days);
+    return date;
+}
+
+function startOfWeek(value = new Date()) {
+    const date = value instanceof Date ? new Date(value.getTime()) : parseDateInput(value);
+    if (!date || Number.isNaN(date.getTime())) return new Date();
+    const day = date.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + diff);
+    return date;
+}
+
+function dateRangesOverlap(startA, endA, startB, endB) {
+    if (!startA || !endA || !startB || !endB) return false;
+    return startA <= endB && startB <= endA;
+}
+
+function buildRosterEntryId(staffEmail, day) {
+    const safeEmail = normalizeEmail(staffEmail).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'staff';
+    return `${safeEmail}--${day}`;
+}
+
+function coerceDate(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (typeof value.toDate === 'function') return value.toDate();
+    if (typeof value === 'string') {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return parseDateInput(value);
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (typeof value.seconds === 'number') return new Date(value.seconds * 1000);
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isDateWithinRange(value, startDate, endDate) {
+    const date = coerceDate(value);
+    if (!date) return false;
+    const normalized = new Date(date.getTime());
+    normalized.setHours(0, 0, 0, 0);
+    const start = new Date(startDate.getTime());
+    const end = new Date(endDate.getTime());
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return normalized >= start && normalized <= end;
+}
+
+function formatCurrency(value) {
+    const amount = Number(value || 0);
+    return `R ${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 function parseAmount(value) {
@@ -1813,6 +2103,8 @@ function pickBestProfileMatch(user, docs = []) {
 function getProfileAccessErrorMessage(error) {
     const code = normalizeFirebaseErrorCode(error && error.code);
     if (!navigator.onLine) return 'You are offline. Reconnect to the internet and retry.';
+    if (code === 'no-profile') return 'Your sign-in succeeded, but no active user profile is linked to this account. Please contact an admin.';
+    if (code === 'inactive') return 'This user profile is inactive. Please contact an admin for access.';
     if (code === 'unavailable' || code === 'deadline-exceeded') return 'We could not reach the server. Please retry in a moment.';
     if (code === 'permission-denied') return 'Your sign-in succeeded, but the app data could not be opened right now. Please retry in a moment.';
     return 'Unable to complete sign-in right now. Please retry.';
@@ -1860,7 +2152,8 @@ function statusBadge(s) {
         discharged: 'badge-gray', pending: 'badge-amber',
         approved: 'badge-green', denied: 'badge-red', paid: 'badge-green',
         completed: 'badge-green', 'in-progress': 'badge-blue', scheduled: 'badge-purple',
-        compliant: 'badge-green', 'follow-up': 'badge-amber'
+        compliant: 'badge-green', 'follow-up': 'badge-amber', inactive: 'badge-gray',
+        morning: 'badge-blue', afternoon: 'badge-purple', night: 'badge-cyan', off: 'badge-gray'
     };
     const cls = map[s] || 'badge-gray';
     return `<span class="badge ${cls}">${escapeHTML(s || '—')}</span>`;
@@ -1964,12 +2257,19 @@ async function loadProfile(user) {
                     qs = await getDocs(query(usersRef, where('email', '==', normalizedEmail)));
                 }
                 if (qs.empty) {
-                    currentProfile = buildSessionProfile(user);
-                    return currentProfile;
+                    const profileError = new Error('No active profile found for this account.');
+                    profileError.code = 'no-profile';
+                    throw profileError;
                 }
                 snap = pickBestProfileMatch(user, qs.docs);
             }
-            currentProfile = buildSessionProfile(user, snap.data());
+            const profileData = snap.data();
+            if (!isUserConfiguredAdmin(user) && !isUserActive(profileData)) {
+                const inactiveError = new Error('This account is inactive.');
+                inactiveError.code = 'inactive';
+                throw inactiveError;
+            }
+            currentProfile = buildSessionProfile(user, profileData);
             return currentProfile;
         } catch (error) {
             if (!isRetryableProfileAccessError(error) || attempt === 2) {
@@ -2055,6 +2355,7 @@ const NAV_ITEMS = [
     { id: 'medications', icon: '💊', label: 'Medications',       roles: ['admin','staff','doctor'] },
     { id: 'leaves',      icon: '🗓️', label: 'Leave Requests',    roles: ['admin','staff','doctor'] },
     { id: 'users',       icon: '👥', label: 'Admin Workspace',   roles: ['admin'] },
+    { id: 'settings',    icon: '⚙️', label: 'Settings',          roles: ['admin'] },
     { id: 'finance',     icon: '💰', label: 'Finance',           roles: ['admin'] },
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
@@ -2290,13 +2591,14 @@ window.navigateTo = function(id) {
     const navEl = document.getElementById('nav-' + id);
     if (navEl) navEl.classList.add('active');
 
-    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Admin Workspace',
+    const labels = { dashboard:'Dashboard', residents:'Residents', users:'Admin Workspace', settings:'Settings',
                      tasks:'Tasks', events:'Events Management', inspections:'Department Inspector Visitation', medications:'Medications', finance:'Finance',
                      leaves:'Leave Requests', activities:'Audit Log' };
     const subtitles = {
         dashboard: 'Track residents, staffing, and home operations in one place.',
         residents: 'Review resident wellbeing, room details, and care status updates.',
         users: 'Manage the staff directory and jump into finance or audit reviews from one place.',
+        settings: 'Generate advanced reports and manage user access from this admin-only settings module.',
         tasks: 'Monitor assignments, priority items, and operational progress.',
         events: 'Plan house events, keep dates visible, and coordinate responsibilities in one workspace.',
         inspections: 'Log inspector visitations, findings, and compliance follow-up for each department.',
@@ -2320,6 +2622,7 @@ function loadSection(id) {
     switch (id) {
         case 'residents':    loadResidents();    break;
         case 'users':       loadUsers();       break;
+        case 'settings':    loadSettings();    break;
         case 'tasks':       loadTasks();       break;
         case 'events':      loadEvents();      break;
         case 'inspections': loadInspections(); break;
@@ -2581,6 +2884,8 @@ async function loadUsers() {
     if (getCurrentUserRole() !== 'admin') {
         usersAll = [];
         tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔒</div><p>Only admins can manage the staff directory.</p></div></td></tr>';
+        renderUserAdminWorkspace([]);
+        renderWorkRoster([], [], []);
         return;
     }
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
@@ -2588,8 +2893,10 @@ async function loadUsers() {
         const snap = await getDocs(collection(db, STAFF_DIRECTORY_COLLECTION));
         usersAll = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
         filterUsers();
+        await loadWorkRoster(usersAll);
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        renderWorkRoster([], [], [], e);
     }
 }
 
@@ -2667,6 +2974,195 @@ function renderUserAdminWorkspace(filteredUsers = usersAll) {
         </div>
     `;
 }
+
+function ensureRosterWeekValue() {
+    const input = document.getElementById('roster-week-start');
+    if (!input) return '';
+    if (!input.value) {
+        input.value = formatDateInputValue(startOfWeek(new Date()));
+    }
+    return input.value;
+}
+
+function getRosterWeekDates() {
+    const startValue = ensureRosterWeekValue();
+    const weekStart = startOfWeek(startValue || new Date());
+    return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+}
+
+function renderWorkRoster(staffRows = [], rosterRows = [], leaveRows = [], error = null) {
+    const head = document.getElementById('work-roster-head');
+    const body = document.getElementById('work-roster-body');
+    const summary = document.getElementById('work-roster-summary');
+    if (!head || !body || !summary) return;
+
+    if (getCurrentUserRole() !== 'admin') {
+        summary.innerHTML = '<div class="admin-list-item"><strong>Admin only</strong><span>The interactive work roster is only available on the admin workspace.</span></div>';
+        body.innerHTML = '<tr><td colspan="2"><div class="empty"><div class="e-icon">🔒</div><p>Only admins can access the work roster.</p></div></td></tr>';
+        return;
+    }
+
+    if (error) {
+        summary.innerHTML = '<div class="admin-list-item"><strong>Roster unavailable</strong><span>We could not load the roster data for this week.</span></div>';
+        body.innerHTML = `<tr><td colspan="2"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(error.message || 'Unable to load roster')}</p></div></td></tr>`;
+        return;
+    }
+
+    const weekDates = getRosterWeekDates();
+    head.innerHTML = `<tr><th>Staff Member</th>${weekDates.map(date => `<th>${escapeHTML(date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }))}</th>`).join('')}</tr>`;
+
+    if (!staffRows.length) {
+        summary.innerHTML = '<div class="admin-list-item"><strong>No staff available</strong><span>Add staff directory entries to start building the work roster.</span></div>';
+        body.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="e-icon">👥</div><p>No staff directory entries are available for roster planning.</p></div></td></tr>';
+        return;
+    }
+
+    const rosterMap = new Map(rosterRows.map(entry => [`${normalizeEmail(entry.staffEmail)}|${entry.day}`, entry]));
+    const approvedLeaves = leaveRows.filter(entry => String(entry.status || '').toLowerCase() === 'approved');
+    const assignedCount = rosterRows.filter(entry => String(entry.shift || '').trim()).length;
+    const leaveBlockedCount = approvedLeaves.length;
+    const offDutyCount = rosterRows.filter(entry => entry.shift === 'off').length;
+
+    summary.innerHTML = `
+        <div class="admin-list-item">
+            <strong>Weekly coverage</strong>
+            <span>${assignedCount} planned roster entr${assignedCount === 1 ? 'y' : 'ies'} for ${staffRows.length} staff member${staffRows.length === 1 ? '' : 's'}.</span>
+        </div>
+        <div class="admin-list-item">
+            <strong>Approved leave blocks</strong>
+            <span>${leaveBlockedCount} leave request${leaveBlockedCount === 1 ? '' : 's'} may affect scheduling for this week.</span>
+        </div>
+        <div class="admin-list-item">
+            <strong>Off duty</strong>
+            <span>${offDutyCount} roster slot${offDutyCount === 1 ? '' : 's'} are currently marked as off duty.</span>
+        </div>
+    `;
+
+    body.innerHTML = staffRows.map(staff => {
+        const staffEmail = normalizeEmail(staff.email);
+        const safeEmail = escapeHTML(staffEmail);
+        const safeName = escapeHTML(staff.name || staff.email || 'Unnamed staff');
+        const safePosition = escapeHTML(staff.position || 'Staff member');
+        const safeDepartment = escapeHTML(staff.department || 'No department');
+        return `<tr>
+            <td>
+                <strong>${safeName}</strong>
+                <span class="roster-meta">${safePosition} · ${safeDepartment}</span>
+            </td>
+            ${weekDates.map(date => {
+                const day = formatDateInputValue(date);
+                const rosterEntry = rosterMap.get(`${staffEmail}|${day}`);
+                const leaveEntry = approvedLeaves.find(leave => normalizeEmail(leave.resolvedStaffEmail || leave.staffEmail || leave.email || leave.staffMemberEmail || '') === staffEmail
+                    ? isDateWithinRange(day, coerceDate(leave.startDate), coerceDate(leave.endDate))
+                    : false);
+                if (leaveEntry) {
+                    return `<td class="roster-cell">${statusBadge('approved')}<span class="roster-meta">On approved leave</span></td>`;
+                }
+                return `<td class="roster-cell">
+                    <select data-staff-email="${safeEmail}" data-staff-name="${safeName}" data-position="${safePosition}" data-department="${safeDepartment}" data-day="${day}"
+                        onchange="updateRosterShift(this.dataset.staffEmail, this.dataset.staffName, this.dataset.position, this.dataset.department, this.dataset.day, this.value)">
+                        ${ROSTER_SHIFT_OPTIONS.map(option => `<option value="${option.value}" ${String(rosterEntry?.shift || '') === option.value ? 'selected' : ''}>${escapeHTML(option.label)}</option>`).join('')}
+                    </select>
+                    <span class="roster-meta">${rosterEntry?.shift ? `Saved: ${escapeHTML(rosterEntry.shift)}` : 'Select a shift'}</span>
+                </td>`;
+            }).join('')}
+        </tr>`;
+    }).join('');
+}
+
+async function loadWorkRoster(staffRows = null) {
+    const body = document.getElementById('work-roster-body');
+    if (body) {
+        body.innerHTML = '<tr><td colspan="8"><div class="empty"><div class="e-icon">🗂️</div><p>Loading roster…</p></div></td></tr>';
+    }
+    try {
+        if (getCurrentUserRole() !== 'admin') {
+            renderWorkRoster([], [], []);
+            return;
+        }
+        const staff = Array.isArray(staffRows) && staffRows.length
+            ? [...staffRows]
+            : (await getDocs(collection(db, STAFF_DIRECTORY_COLLECTION))).docs.map(docSnap => ({ _docId: docSnap.id, ...docSnap.data() }));
+        const weekDates = getRosterWeekDates();
+        const weekStart = formatDateInputValue(weekDates[0]);
+        const weekEnd = formatDateInputValue(weekDates[weekDates.length - 1]);
+        const [rosterSnap, leaveSnap, managedUsersSnap] = await Promise.all([
+            getDocs(collection(db, WORK_ROSTER_COLLECTION)),
+            getDocs(collection(db, 'leaves')),
+            getDocs(collection(db, MANAGED_USER_COLLECTION))
+        ]);
+        const managedUserEmailByUid = new Map(managedUsersSnap.docs.map(docSnap => {
+            const data = docSnap.data() || {};
+            return [data.uid || docSnap.id, normalizeEmail(data.email)];
+        }));
+        const rosterRows = rosterSnap.docs
+            .map(docSnap => ({ _docId: docSnap.id, ...docSnap.data() }))
+            .filter(entry => entry.day && entry.day >= weekStart && entry.day <= weekEnd);
+        const leaveRows = leaveSnap.docs
+            .map(docSnap => {
+                const data = docSnap.data() || {};
+                return {
+                    _docId: docSnap.id,
+                    ...data,
+                    resolvedStaffEmail: normalizeEmail(data.staffEmail || managedUserEmailByUid.get(data.staffUid) || '')
+                };
+            })
+            .filter(entry => {
+                const start = coerceDate(entry.startDate);
+                const end = coerceDate(entry.endDate);
+                return start && end && dateRangesOverlap(start, end, weekDates[0], weekDates[weekDates.length - 1]);
+            });
+        renderWorkRoster(staff, rosterRows, leaveRows);
+    } catch (error) {
+        renderWorkRoster(Array.isArray(staffRows) ? staffRows : [], [], [], error);
+    }
+}
+
+window.setRosterWeek = function(value) {
+    const input = document.getElementById('roster-week-start');
+    if (!input) return;
+    input.value = formatDateInputValue(startOfWeek(value || new Date()));
+    loadWorkRoster(usersAll);
+};
+
+window.shiftRosterWeek = function(days) {
+    const input = document.getElementById('roster-week-start');
+    const current = startOfWeek(input?.value || new Date());
+    const nextWeek = addDays(current, Number(days) || 0);
+    window.setRosterWeek(nextWeek);
+};
+
+window.resetRosterWeek = function() {
+    window.setRosterWeek(new Date());
+};
+
+window.updateRosterShift = async function(staffEmail, staffName, position, department, day, shift) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can update the work roster.');
+        return;
+    }
+    const rosterId = buildRosterEntryId(staffEmail, day);
+    try {
+        if (!shift) {
+            await deleteDoc(doc(db, WORK_ROSTER_COLLECTION, rosterId)).catch(() => {});
+        } else {
+            await setDoc(doc(db, WORK_ROSTER_COLLECTION, rosterId), {
+                staffEmail: normalizeEmail(staffEmail),
+                staffName: String(staffName || '').trim(),
+                position: String(position || '').trim(),
+                department: String(department || '').trim(),
+                day,
+                shift,
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+        }
+        await logActivity(`Work roster updated for ${staffName || staffEmail} on ${day}: ${shift || 'unassigned'}`);
+        toast(`Roster updated for ${staffName || staffEmail}.`);
+        await loadWorkRoster(usersAll);
+    } catch (error) {
+        toast('Error: ' + error.message);
+    }
+};
 
 window.filterUsers = function() {
     const tb     = document.getElementById('users-tbody');
@@ -2788,6 +3284,455 @@ window.editUser = function(id) {
     configureUserModal('edit', user);
     document.getElementById('modal-user').removeAttribute('hidden');
 };
+
+function renderSettingsModuleSummary(filteredUsers = managedUsersAll) {
+    const moduleSummary = document.getElementById('settings-module-summary');
+    const userSummary = document.getElementById('settings-user-summary');
+    if (!moduleSummary || !userSummary) return;
+
+    const totalUsers = managedUsersAll.length;
+    const activeUsers = managedUsersAll.filter(user => isUserActive(user)).length;
+    const inactiveUsers = totalUsers - activeUsers;
+    const admins = managedUsersAll.filter(user => normalizeUserRole(user.role) === 'admin').length;
+    const doctors = managedUsersAll.filter(user => normalizeUserRole(user.role) === 'doctor').length;
+    const filteredCount = Array.isArray(filteredUsers) ? filteredUsers.length : totalUsers;
+    const departments = new Set(managedUsersAll.map(user => String(user.dept || '').trim()).filter(Boolean));
+
+    moduleSummary.innerHTML = `
+        <div class="admin-list-item">
+            <strong>Advanced reporting</strong>
+            <span>Use the generator below to review operations, staffing, and finance performance over a selected period.</span>
+        </div>
+        <div class="admin-list-item">
+            <strong>User access control</strong>
+            <span>${filteredCount !== totalUsers ? `You are reviewing ${filteredCount} of ${totalUsers} managed user profile(s).` : `All ${totalUsers} managed user profile(s) are available for update.`}</span>
+        </div>
+        <div class="admin-list-item">
+            <strong>Admin-only tools</strong>
+            <span>This module appears only for admins and keeps account changes separate from the public workspace.</span>
+        </div>
+    `;
+
+    userSummary.innerHTML = totalUsers
+        ? `
+            <div class="admin-list">
+                <div class="admin-list-item">
+                    <strong>Active users</strong>
+                    <span>${activeUsers} active profile${activeUsers === 1 ? '' : 's'} can access the app.</span>
+                </div>
+                <div class="admin-list-item">
+                    <strong>Inactive users</strong>
+                    <span>${inactiveUsers} profile${inactiveUsers === 1 ? '' : 's'} are currently disabled.</span>
+                </div>
+                <div class="admin-list-item">
+                    <strong>Role coverage</strong>
+                    <span>${admins} admin, ${doctors} doctor, and ${Math.max(totalUsers - admins - doctors, 0)} staff profile${Math.max(totalUsers - admins - doctors, 0) === 1 ? '' : 's'} are configured.</span>
+                </div>
+                <div class="admin-list-item">
+                    <strong>Departments</strong>
+                    <span>${departments.size || 0} department${departments.size === 1 ? '' : 's'} are represented in user access records.</span>
+                </div>
+            </div>
+        `
+        : '<div class="empty"><div class="e-icon">👤</div><p>No app users have been configured yet.</p></div>';
+}
+
+function renderManagedUsersTable(filteredUsers = managedUsersAll) {
+    const tb = document.getElementById('managed-users-tbody');
+    const cntEl = document.getElementById('managed-user-count');
+    if (!tb) return;
+
+    renderSettingsModuleSummary(filteredUsers);
+
+    if (cntEl) cntEl.textContent = managedUsersAll.length
+        ? (filteredUsers.length !== managedUsersAll.length ? `${filteredUsers.length} of ${managedUsersAll.length}` : `${managedUsersAll.length} users`)
+        : '';
+
+    if (!managedUsersAll.length) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">👤</div><p>No managed users found yet.</p></div></td></tr>';
+        return;
+    }
+
+    if (!filteredUsers.length) {
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔍</div><p>No managed users match your filter.</p></div></td></tr>';
+        return;
+    }
+
+    tb.innerHTML = filteredUsers.map(user => {
+        const role = normalizeUserRole(user.role);
+        const safeId = escapeHTML(user._docId || user.uid || '');
+        const label = escapeHTML(user.name || user.email || 'user');
+        return `<tr>
+            <td><strong>${escapeHTML(user.name || '—')}</strong></td>
+            <td>${roleBadgeHTML(role)}</td>
+            <td>${escapeHTML(user.dept || '—')}</td>
+            <td>${statusBadge(isUserActive(user) ? 'active' : 'inactive')}</td>
+            <td>${escapeHTML(user.email || '—')}</td>
+            <td>
+                <div class="table-actions">
+                    <button class="btn btn-ghost btn-sm" data-managed-user-id="${safeId}" onclick="editManagedUser(this.dataset.managedUserId)" aria-label="Edit ${label}">✏️ Edit</button>
+                    <button class="btn btn-ghost btn-sm" data-managed-user-id="${safeId}" onclick="deleteManagedUser(this.dataset.managedUserId)" aria-label="Delete ${label}">🗑 Delete</button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function loadManagedUsers() {
+    const tb = document.getElementById('managed-users-tbody');
+    if (!tb) return;
+    if (getCurrentUserRole() !== 'admin') {
+        managedUsersAll = [];
+        tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🔒</div><p>Only admins can manage app users.</p></div></td></tr>';
+        renderSettingsModuleSummary([]);
+        return;
+    }
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading user access records…</p></div></td></tr>';
+    try {
+        const snap = await getDocs(collection(db, MANAGED_USER_COLLECTION));
+        managedUsersAll = snap.docs
+            .map(docSnap => ({ _docId: docSnap.id, ...docSnap.data() }))
+            .sort((left, right) => {
+                const leftName = String(left.name || left.email || '').toLowerCase();
+                const rightName = String(right.name || right.email || '').toLowerCase();
+                return leftName.localeCompare(rightName);
+            });
+        filterManagedUsers();
+    } catch (error) {
+        tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(error.message)}</p></div></td></tr>`;
+        renderSettingsModuleSummary([]);
+    }
+}
+
+function filterManagedUsers() {
+    const query = String(document.getElementById('managed-user-search')?.value || '').toLowerCase().trim();
+    const filtered = managedUsersAll.filter(user => {
+        const haystack = [
+            user.name,
+            user.email,
+            user.role,
+            user.dept,
+            isUserActive(user) ? 'active' : 'inactive'
+        ].join(' ').toLowerCase();
+        return !query || haystack.includes(query);
+    });
+    renderManagedUsersTable(filtered);
+}
+
+function setDefaultReportDates() {
+    const end = new Date();
+    const start = addDays(end, -29);
+    const startInput = document.getElementById('report-start-date');
+    const endInput = document.getElementById('report-end-date');
+    if (startInput) startInput.value = formatDateInputValue(start);
+    if (endInput) endInput.value = formatDateInputValue(end);
+}
+
+async function generateAdvancedReport() {
+    const output = document.getElementById('advanced-report-output');
+    const note = document.getElementById('report-range-note');
+    const reportType = document.getElementById('report-type')?.value || 'operations';
+    const startValue = document.getElementById('report-start-date')?.value;
+    const endValue = document.getElementById('report-end-date')?.value;
+    const startDate = parseDateInput(startValue);
+    const endDate = parseDateInput(endValue);
+    if (!output) return;
+    if (getCurrentUserRole() !== 'admin') {
+        output.innerHTML = '<div class="empty"><div class="e-icon">🔒</div><p>Only admins can generate advanced reports.</p></div>';
+        return;
+    }
+    if (!startDate || !endDate) {
+        output.innerHTML = '<div class="empty"><div class="e-icon">📅</div><p>Select both a start date and an end date before generating a report.</p></div>';
+        return;
+    }
+    if (endDate < startDate) {
+        output.innerHTML = '<div class="empty"><div class="e-icon">⚠️</div><p>The report end date must be after the start date.</p></div>';
+        return;
+    }
+
+    output.innerHTML = '<div class="empty"><div class="e-icon">📊</div><p>Generating report…</p></div>';
+    if (note) note.textContent = `Reviewing ${startValue} to ${endValue}`;
+
+    try {
+        let stats = [];
+        let notes = [];
+
+        if (reportType === 'operations') {
+            const [residentSnap, taskSnap, eventSnap, inspectionSnap] = await Promise.all([
+                getDocs(collection(db, 'residents')),
+                getDocs(collection(db, 'tasks')),
+                getDocs(collection(db, 'events')),
+                getDocs(collection(db, 'inspections'))
+            ]);
+            const residents = residentSnap.docs.map(docSnap => docSnap.data() || {});
+            const tasks = taskSnap.docs.map(docSnap => docSnap.data() || {}).filter(task => !task.createdAt || isDateWithinRange(task.createdAt, startDate, endDate));
+            const events = eventSnap.docs.map(docSnap => docSnap.data() || {}).filter(event => !event.date || isDateWithinRange(event.date, startDate, endDate));
+            const inspections = inspectionSnap.docs.map(docSnap => docSnap.data() || {}).filter(inspection => !inspection.date || isDateWithinRange(inspection.date, startDate, endDate));
+            stats = [
+                { label: 'Residents', value: residents.length },
+                { label: 'Tasks created', value: tasks.length },
+                { label: 'Events scheduled', value: events.length },
+                { label: 'Inspection visits', value: inspections.length }
+            ];
+            notes = [
+                `${tasks.filter(task => task.status === 'completed').length} task(s) were completed in the selected period.`,
+                `${events.filter(event => event.status === 'completed').length} event(s) reached a completed status.`,
+                `${inspections.filter(inspection => inspection.status === 'critical').length} inspection(s) were marked critical and may need follow-up.`,
+                `${residents.filter(resident => resident.status === 'critical').length} resident(s) are currently marked critical.`
+            ];
+        } else if (reportType === 'staffing') {
+            const [userSnap, leaveSnap, staffSnap, rosterSnap] = await Promise.all([
+                getDocs(collection(db, MANAGED_USER_COLLECTION)),
+                getDocs(collection(db, 'leaves')),
+                getDocs(collection(db, STAFF_DIRECTORY_COLLECTION)),
+                getDocs(collection(db, WORK_ROSTER_COLLECTION))
+            ]);
+            const managedUsers = userSnap.docs.map(docSnap => docSnap.data() || {});
+            const leaveRows = leaveSnap.docs.map(docSnap => docSnap.data() || {}).filter(leave => {
+                const leaveStart = coerceDate(leave.startDate);
+                const leaveEnd = coerceDate(leave.endDate);
+                return leaveStart && leaveEnd && dateRangesOverlap(leaveStart, leaveEnd, startDate, endDate);
+            });
+            const rosterRows = rosterSnap.docs.map(docSnap => docSnap.data() || {}).filter(entry => entry.day && entry.day >= startValue && entry.day <= endValue);
+            stats = [
+                { label: 'Managed users', value: managedUsers.length },
+                { label: 'Active profiles', value: managedUsers.filter(user => isUserActive(user)).length },
+                { label: 'Leave requests', value: leaveRows.length },
+                { label: 'Roster slots', value: rosterRows.length }
+            ];
+            notes = [
+                `${leaveRows.filter(leave => leave.status === 'approved').length} leave request(s) were approved for the selected dates.`,
+                `${staffSnap.size} staff directory entr${staffSnap.size === 1 ? 'y is' : 'ies are'} available for roster planning.`,
+                `${rosterRows.filter(entry => entry.shift === 'night').length} night shift assignment(s) are scheduled in this window.`,
+                `${managedUsers.filter(user => normalizeUserRole(user.role) === 'admin').length} admin profile(s) currently have elevated access.`
+            ];
+        } else {
+            const [donationSnap, incomeSnap, expenditureSnap] = await Promise.all([
+                getDocs(collection(db, 'donations')),
+                getDocs(collection(db, 'income')),
+                getDocs(collection(db, 'expenditure'))
+            ]);
+            const donations = donationSnap.docs.map(docSnap => docSnap.data() || {}).filter(entry => !entry.date || isDateWithinRange(entry.date, startDate, endDate));
+            const income = incomeSnap.docs.map(docSnap => docSnap.data() || {}).filter(entry => !entry.date || isDateWithinRange(entry.date, startDate, endDate));
+            const expenditure = expenditureSnap.docs.map(docSnap => docSnap.data() || {}).filter(entry => !entry.date || isDateWithinRange(entry.date, startDate, endDate));
+            const totalIncome = income.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+            const totalExpenditure = expenditure.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
+            stats = [
+                { label: 'Donations', value: donations.length },
+                { label: 'Income', value: formatCurrency(totalIncome) },
+                { label: 'Expenditure', value: formatCurrency(totalExpenditure) },
+                { label: 'Net position', value: formatCurrency(totalIncome - totalExpenditure) }
+            ];
+            notes = [
+                `${donations.filter(entry => ['monetary', 'grant'].includes(String(entry.type || '').toLowerCase())).length} donation record(s) are financial contributions.`,
+                `${income.filter(entry => String(entry.category || '').toLowerCase() === 'subsidy').length} income record(s) were captured as subsidies.`,
+                `${expenditure.filter(entry => String(entry.status || '').toLowerCase() === 'paid').length} expenditure item(s) are already paid.`,
+                `The current report window covers ${income.length + expenditure.length + donations.length} finance record(s).`
+            ];
+        }
+
+        output.dataset.ready = 'true';
+        output.innerHTML = `
+            <div class="report-stat-grid">
+                ${stats.map(stat => `
+                    <div class="report-stat">
+                        <strong>${escapeHTML(stat.label)}</strong>
+                        <span>${escapeHTML(stat.value)}</span>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="report-notes">
+                ${notes.map(entry => `<div class="report-note">${escapeHTML(entry)}</div>`).join('')}
+            </div>
+        `;
+    } catch (error) {
+        output.innerHTML = `<div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(error.message)}</p></div>`;
+    }
+}
+
+async function loadSettings() {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can access Settings.');
+        return;
+    }
+    setDefaultReportDates();
+    await loadManagedUsers();
+    await generateAdvancedReport();
+}
+
+function resetManagedUserModalMessage() {
+    const message = document.getElementById('modal-managed-user-msg');
+    if (!message) return;
+    message.textContent = '';
+    message.className = 'modal-msg';
+}
+
+function configureManagedUserModal(mode = 'create', user = null) {
+    const isEdit = mode === 'edit' && user;
+    const title = document.getElementById('managed-user-modal-title');
+    const note = document.getElementById('managed-user-note');
+    const emailInput = document.getElementById('mu-email');
+    const emailHelp = document.getElementById('mu-email-help');
+    const passwordGroup = document.getElementById('managed-user-password-group');
+    const saveBtn = document.getElementById('save-managed-user-btn');
+
+    editingManagedUserId = isEdit ? (user._docId || user.uid) : null;
+    document.getElementById('mu-name').value = isEdit ? (user.name || '') : '';
+    emailInput.value = isEdit ? (user.email || '') : '';
+    emailInput.readOnly = isEdit;
+    document.getElementById('mu-role').value = isEdit ? normalizeUserRole(user.role) : 'staff';
+    document.getElementById('mu-department').value = isEdit ? (user.dept || '') : '';
+    document.getElementById('mu-active').value = isEdit ? String(isUserActive(user)) : 'true';
+    document.getElementById('mu-password').value = '';
+
+    if (isEdit) {
+        title.textContent = '✏️ Edit User';
+        note.textContent = 'Update the access profile. Email changes require recreating the user.';
+        emailHelp.textContent = 'Email addresses are locked after creation to avoid desynchronizing Firebase Authentication.';
+        passwordGroup.hidden = true;
+        saveBtn.textContent = 'Save Changes';
+    } else {
+        title.textContent = '🧑‍💼 Add User';
+        note.textContent = 'Create a login profile for a staff member. New accounts require a temporary password.';
+        emailHelp.textContent = 'The email address becomes the username for app sign-in.';
+        passwordGroup.hidden = false;
+        saveBtn.textContent = 'Create User';
+    }
+
+    resetManagedUserModalMessage();
+}
+
+async function withSecondaryUserAuth(action) {
+    const appName = `bophelong-user-admin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const secondaryApp = initializeApp(firebaseConfig, appName);
+    const secondaryAuth = getAuth(secondaryApp);
+    try {
+        return await action(secondaryAuth);
+    } finally {
+        try { await signOut(secondaryAuth); } catch (_) { /* secondary auth may already be signed out */ }
+        try { await deleteApp(secondaryApp); } catch (_) { /* app may already be deleted */ }
+    }
+}
+
+function editManagedUser(id) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can manage app users.');
+        return;
+    }
+    const user = managedUsersAll.find(entry => (entry._docId || entry.uid) === id);
+    if (!user) {
+        toast('Unable to find that user profile.');
+        return;
+    }
+    configureManagedUserModal('edit', user);
+    document.getElementById('modal-managed-user').removeAttribute('hidden');
+}
+
+async function deleteManagedUser(id) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can manage app users.');
+        return;
+    }
+    const user = managedUsersAll.find(entry => (entry._docId || entry.uid) === id);
+    if (!user) {
+        toast('Unable to find that user profile.');
+        return;
+    }
+    if (normalizeEmail(user.email) === configuredAdminEmail) {
+        toast('The configured admin account cannot be deleted here.');
+        return;
+    }
+    if (!confirm(`Delete ${user.name || user.email} from user management?`)) return;
+    try {
+        await deleteDoc(doc(db, MANAGED_USER_COLLECTION, id));
+        await logActivity(`Admin removed user profile: ${user.email || id}`);
+        toast('User profile deleted. That sign-in will no longer open the app.');
+        await loadManagedUsers();
+        await loadDashboardStats();
+    } catch (error) {
+        toast('Error: ' + error.message);
+    }
+}
+
+async function saveManagedUser() {
+    if (getCurrentUserRole() !== 'admin') {
+        modalMsg('managed-user', 'Only admins can manage app users.', 'error');
+        return;
+    }
+
+    const isEdit = !!editingManagedUserId;
+    const name = document.getElementById('mu-name').value.trim();
+    const email = normalizeEmail(document.getElementById('mu-email').value);
+    const role = normalizeUserRole(document.getElementById('mu-role').value);
+    const dept = document.getElementById('mu-department').value.trim();
+    const active = document.getElementById('mu-active').value === 'true';
+    const password = document.getElementById('mu-password').value;
+    const btn = document.getElementById('save-managed-user-btn');
+
+    if (!name || !email || !role) {
+        modalMsg('managed-user', 'Name, email, and role are required.', 'error');
+        return;
+    }
+    if (!isEdit && password.length < 8) {
+        modalMsg('managed-user', 'Temporary passwords must be at least 8 characters long.', 'error');
+        return;
+    }
+
+    const duplicateEmail = managedUsersAll.find(user => normalizeEmail(user.email) === email && (user._docId || user.uid) !== editingManagedUserId);
+    if (duplicateEmail) {
+        modalMsg('managed-user', 'A user with that email already exists.', 'error');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> ${isEdit ? 'Saving…' : 'Creating…'}`;
+
+    try {
+        if (isEdit) {
+            const existing = managedUsersAll.find(user => (user._docId || user.uid) === editingManagedUserId);
+            if (!existing) throw new Error('That user profile could not be found.');
+            if (normalizeEmail(existing.email) === configuredAdminEmail && (!active || role !== 'admin')) {
+                throw new Error('The configured admin must remain an active admin.');
+            }
+            await setDoc(doc(db, MANAGED_USER_COLLECTION, editingManagedUserId), {
+                name,
+                email: existing.email,
+                role,
+                active,
+                uid: existing.uid || editingManagedUserId,
+                dept,
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            await logActivity(`Admin updated user profile: ${existing.email}`);
+            closeModal('managed-user');
+            toast('User profile updated.');
+        } else {
+            const credential = await withSecondaryUserAuth(secondaryAuth =>
+                createUserWithEmailAndPassword(secondaryAuth, email, password)
+            );
+            await setDoc(doc(db, MANAGED_USER_COLLECTION, credential.user.uid), {
+                name,
+                email,
+                role,
+                active,
+                uid: credential.user.uid,
+                dept,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+            await logActivity(`Admin created user profile: ${email} (${role})`);
+            closeModal('managed-user');
+            toast(`User created. Share the temporary password with ${name}.`, 5000);
+        }
+        await loadManagedUsers();
+        await loadDashboardStats();
+    } catch (error) {
+        modalMsg('managed-user', 'Error: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = isEdit ? 'Save Changes' : 'Create User';
+    }
+}
 
 // ── Tasks ─────────────────────────────────────────────────────────────
 async function loadTasks() {
@@ -3261,14 +4206,16 @@ async function loadActivities() {
 
 // ── Modals ──────────────────────────────────────────────────────────────
 window.openModal  = function(name) {
-    if (name === 'user' && getCurrentUserRole() !== 'admin') {
-        toast('Only admins can manage the staff directory.');
+    if ((name === 'user' || name === 'managed-user') && getCurrentUserRole() !== 'admin') {
+        toast('Only admins can manage staff and user settings.');
         return;
     }
     document.getElementById('modal-' + name).removeAttribute('hidden');
     // Reset user form fields each time the modal is opened
     if (name === 'user') {
         configureUserModal('create');
+    } else if (name === 'managed-user') {
+        configureManagedUserModal('create');
     }
 };
 window.closeModal = function(name) {
@@ -3277,6 +4224,9 @@ window.closeModal = function(name) {
     if (name === 'user') {
         editingUserId = null;
         resetUserModalMessage();
+    } else if (name === 'managed-user') {
+        editingManagedUserId = null;
+        resetManagedUserModalMessage();
     }
 };
 
@@ -3556,8 +4506,16 @@ window.updateEventStatus = updateEventStatus;
 window.deleteEvent      = deleteEvent;
 window.deleteInspection = deleteInspection;
 window.deleteUserEntry  = deleteUserEntry;
+window.loadWorkRoster   = loadWorkRoster;
 window.approveLeave     = approveLeave;
 window.denyLeave        = denyLeave;
+window.loadSettings     = loadSettings;
+window.filterManagedUsers = filterManagedUsers;
+window.setDefaultReportDates = setDefaultReportDates;
+window.generateAdvancedReport = generateAdvancedReport;
+window.editManagedUser  = editManagedUser;
+window.deleteManagedUser = deleteManagedUser;
+window.saveManagedUser  = saveManagedUser;
 
 </script>
 </body>

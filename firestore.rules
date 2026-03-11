@@ -26,7 +26,14 @@ service cloud.firestore {
     }
 
     function hasAppAccess() {
-      return isSignedIn();
+      return isSignedIn()
+        && (
+          isConfiguredAdmin()
+          || (
+            userDoc().exists()
+            && userDoc().data.get('active', false)
+          )
+        );
     }
 
     function hasRole(role) {
@@ -154,6 +161,29 @@ service cloud.firestore {
         && (!data.keys().hasAll(['completedAt']) || data.completedAt is timestamp);
     }
 
+    function isValidRosterShift(shift) {
+      return shift == 'morning'
+        || shift == 'afternoon'
+        || shift == 'night'
+        || shift == 'off';
+    }
+
+    function isWorkRosterPayload(data) {
+      return data.keys().hasAll(['staffEmail', 'staffName', 'day', 'shift'])
+        && data.keys().hasOnly(['staffEmail', 'staffName', 'position', 'department', 'day', 'shift', 'updatedAt'])
+        && data.staffEmail is string
+        && data.staffEmail.size() > 0
+        && data.staffName is string
+        && data.staffName.size() > 0
+        && (!data.keys().hasAll(['position']) || data.position is string)
+        && (!data.keys().hasAll(['department']) || data.department is string)
+        && data.day is string
+        && data.day.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.shift is string
+        && isValidRosterShift(data.shift)
+        && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
     function isEventPayload(data) {
       return data.keys().hasAll(['title', 'date', 'status', 'createdBy'])
         && data.keys().hasOnly(['title', 'date', 'type', 'venue', 'coordinator', 'status', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
@@ -244,6 +274,12 @@ service cloud.firestore {
         && hasStaffUid(request.resource.data)
         && request.resource.data.staffUid == resource.data.staffUid;
       allow delete: if isAdmin();
+    }
+
+    match /workRoster/{entryId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && isWorkRosterPayload(request.resource.data);
     }
 
     match /residents/{docId} {
