@@ -1385,6 +1385,26 @@
                 </div>
             </div>
 
+            <!-- FUNDERS HUB -->
+            <div class="section" id="sec-funders">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🤝 Funders Hub</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openModal('funder')">+ Add Funder</button>
+                    </div>
+                    <div class="card-body" style="padding:0">
+                        <table>
+                            <thead>
+                                <tr><th>Funder</th><th>Contact</th><th>Email / Phone</th><th>Funding Type</th><th>Status</th><th>Notes</th></tr>
+                            </thead>
+                            <tbody id="funders-tbody">
+                                <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- LEAVES -->
             <div class="section" id="sec-leaves">
                 <div class="card">
@@ -1642,6 +1662,40 @@
         <div class="modal-footer">
             <button class="btn btn-ghost" onclick="closeModal('donation')">Cancel</button>
             <button class="btn btn-primary" onclick="saveDonation()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- Funder modal -->
+<div class="modal-overlay" id="modal-funder" hidden>
+    <div class="modal">
+        <h3>🤝 Add Funder</h3>
+        <div class="form-group"><label>Funder Name</label><input id="f-name" placeholder="Organisation or individual name"></div>
+        <div class="form-group"><label>Contact Person</label><input id="f-contact" placeholder="Primary relationship owner"></div>
+        <div class="form-group"><label>Email Address</label><input id="f-email" type="email" placeholder="contact@funder.org"></div>
+        <div class="form-group"><label>Phone Number</label><input id="f-phone" type="tel" placeholder="e.g. +27 12 345 6789"></div>
+        <div class="form-group">
+            <label>Funding Type</label>
+            <select id="f-type">
+                <option value="grant">Grant</option>
+                <option value="corporate">Corporate Sponsorship</option>
+                <option value="government">Government Funding</option>
+                <option value="individual">Individual Giving</option>
+                <option value="in-kind">In-Kind Support</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Status</label>
+            <select id="f-status">
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea id="f-notes" placeholder="Partnership focus, reporting dates, or stewardship notes"></textarea></div>
+        <div class="modal-msg" id="modal-funder-msg"></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('funder')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveFunder()">Save Funder</button>
         </div>
     </div>
 </div>
@@ -2360,6 +2414,7 @@ const NAV_ITEMS = [
     { id: 'users',       icon: '👥', label: 'Admin Workspace',   roles: ['admin'] },
     { id: 'settings',    icon: '⚙️', label: 'Settings',          roles: ['admin'] },
     { id: 'finance',     icon: '💰', label: 'Finance',           roles: ['admin'] },
+    { id: 'funders',     icon: '🤝', label: 'Funders Hub',       roles: ['admin'] },
     { id: 'activities',  icon: '📜', label: 'Audit Log',         roles: ['admin'] },
 ];
 
@@ -2595,7 +2650,7 @@ window.navigateTo = function(id) {
     if (navEl) navEl.classList.add('active');
 
     const labels = { dashboard:'Dashboard', residents:'Residents', users:'Admin Workspace', settings:'Settings',
-                     tasks:'Tasks', events:'Events Management', inspections:'Department Inspector Visitation', medications:'Medications', finance:'Finance',
+                     tasks:'Tasks', events:'Events Management', inspections:'Department Inspector Visitation', medications:'Medications', finance:'Finance', funders:'Funders Hub',
                      leaves:'Leave Requests', activities:'Audit Log' };
     const subtitles = {
         dashboard: 'Track residents, staffing, and home operations in one place.',
@@ -2607,6 +2662,7 @@ window.navigateTo = function(id) {
         inspections: 'Log inspector visitations, findings, and compliance follow-up for each department.',
         medications: 'Keep medication schedules and treatment records easy to review.',
         finance: 'Manage donations, income, and expenditure with a clearer overview.',
+        funders: 'Track active funders, stewardship contacts, and partnership notes in one hub.',
         leaves: 'Follow leave requests and staffing availability without switching context.',
         activities: 'Audit important changes and recent platform activity.'
     };
@@ -2631,6 +2687,7 @@ function loadSection(id) {
         case 'inspections': loadInspections(); break;
         case 'medications': loadMedications(); break;
         case 'finance':     loadFinance();     break;
+        case 'funders':     loadFunders();     break;
         case 'leaves':      loadLeaves();      break;
         case 'activities':  loadActivities();  break;
     }
@@ -4061,6 +4118,33 @@ async function loadFinance() {
     await Promise.all([loadDonations(), loadIncome(), loadExpenditure()]);
 }
 
+// ── Funders Hub ───────────────────────────────────────────────────────────
+async function loadFunders() {
+    const tb = document.getElementById('funders-tbody');
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
+    try {
+        const snap = await getDocs(query(collection(db, 'funders'), orderBy('name')));
+        if (snap.empty) {
+            tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🤝</div><p>No funders added yet.</p></div></td></tr>';
+            return;
+        }
+        tb.innerHTML = snap.docs.map(d => {
+            const funder = d.data() || {};
+            const contactSummary = [funder.email, funder.phone].filter(Boolean).map(escapeHTML).join('<br>') || '—';
+            return `<tr>
+                <td><strong>${escapeHTML(funder.name || '—')}</strong></td>
+                <td>${escapeHTML(funder.contactPerson || '—')}</td>
+                <td>${contactSummary}</td>
+                <td><span class="badge badge-purple">${escapeHTML(funder.fundingType || '—')}</span></td>
+                <td>${statusBadge(funder.status || 'inactive')}</td>
+                <td>${escapeHTML(funder.notes || '—')}</td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+    }
+}
+
 // ── Donations ──────────────────────────────────────────────────────────
 async function loadDonations() {
     const tb = document.getElementById('donations-tbody');
@@ -4446,6 +4530,38 @@ window.saveDonation = async function() {
         toast('Donation recorded.');
         loadDonations();
     } catch (e) { modalMsg('donation', 'Error: ' + e.message, 'error'); }
+};
+
+// ── Save Funder ──────────────────────────────────────────────────────────
+window.saveFunder = async function() {
+    const name = document.getElementById('f-name').value.trim();
+    const contactPerson = document.getElementById('f-contact').value.trim();
+    const email = normalizeEmail(document.getElementById('f-email').value);
+    const phone = document.getElementById('f-phone').value.trim();
+    const fundingType = document.getElementById('f-type').value;
+    const status = document.getElementById('f-status').value;
+    const notes = document.getElementById('f-notes').value.trim();
+    if (!name || !contactPerson || (!email && !phone)) {
+        modalMsg('funder', 'Funder name, contact person, and at least one contact detail are required.', 'error');
+        return;
+    }
+    try {
+        await addDoc(collection(db, 'funders'), {
+            name,
+            contactPerson,
+            ...(email ? { email } : {}),
+            ...(phone ? { phone } : {}),
+            fundingType,
+            status,
+            ...(notes ? { notes } : {}),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        await logActivity(`Funder added: ${name} (${fundingType})`);
+        closeModal('funder');
+        toast('Funder saved.');
+        loadFunders();
+    } catch (e) { modalMsg('funder', 'Error: ' + e.message, 'error'); }
 };
 
 // ── Save Income ──────────────────────────────────────────────────────────
