@@ -222,8 +222,8 @@ service cloud.firestore {
         && data.contactPerson is string
         && data.contactPerson.size() > 0
         && data.contactPerson.size() <= 200
-        && (!data.keys().hasAll(['email']) || (data.email is string && data.email.size() <= 320))
-        && (!data.keys().hasAll(['phone']) || (data.phone is string && data.phone.size() <= 50))
+        && (!data.keys().hasAll(['email']) || (data.email is string && data.email.size() > 0 && data.email.size() <= 320))
+        && (!data.keys().hasAll(['phone']) || (data.phone is string && data.phone.size() > 0 && data.phone.size() <= 50))
         && (data.keys().hasAll(['email']) || data.keys().hasAll(['phone']))
         && data.fundingType is string
         && isValidFunderType(data.fundingType)
