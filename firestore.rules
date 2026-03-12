@@ -220,17 +220,20 @@ service cloud.firestore {
         && value.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
     }
 
+    function isNonBlankString(value, maxLength) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= maxLength
+        && value.matches('^.*\\S.*$');
+    }
+
     function isFunderPayload(data) {
       return data.keys().hasAll(['name', 'contactPerson', 'fundingType', 'status'])
         && data.keys().hasOnly(['name', 'contactPerson', 'email', 'phone', 'fundingType', 'status', 'notes', 'createdAt', 'updatedAt'])
-        && data.name is string
-        && data.name.size() > 0
-        && data.name.size() <= 200
-        && data.contactPerson is string
-        && data.contactPerson.size() > 0
-        && data.contactPerson.size() <= 200
+        && isNonBlankString(data.name, 200)
+        && isNonBlankString(data.contactPerson, 200)
         && (!data.keys().hasAll(['email']) || isValidEmailAddress(data.email))
-        && (!data.keys().hasAll(['phone']) || (data.phone is string && data.phone.size() > 0 && data.phone.size() <= 50))
+        && (!data.keys().hasAll(['phone']) || isNonBlankString(data.phone, 50))
         && (data.keys().hasAll(['email']) || data.keys().hasAll(['phone']))
         && data.fundingType is string
         && isValidFunderType(data.fundingType)
@@ -239,6 +242,14 @@ service cloud.firestore {
         && (!data.keys().hasAll(['notes']) || (data.notes is string && data.notes.size() <= 2000))
         && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
         && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
+    function preservesFunderCreatedAt() {
+      return !resource.data.keys().hasAll(['createdAt'])
+        || (
+          request.resource.data.keys().hasAll(['createdAt'])
+          && request.resource.data.createdAt == resource.data.createdAt
+        );
     }
 
     function isEventPayload(data) {
@@ -328,8 +339,13 @@ service cloud.firestore {
 
     match /funders/{docId} {
       allow read: if isAdmin();
-      allow create, update: if isAdmin()
-        && isFunderPayload(request.resource.data);
+      allow create: if isAdmin()
+        && isFunderPayload(request.resource.data)
+        && request.resource.data.keys().hasAll(['createdAt', 'updatedAt']);
+      allow update: if isAdmin()
+        && isFunderPayload(request.resource.data)
+        && request.resource.data.keys().hasAll(['updatedAt'])
+        && preservesFunderCreatedAt();
       allow delete: if isAdmin();
     }
 
