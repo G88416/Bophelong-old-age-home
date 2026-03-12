@@ -1795,7 +1795,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, si
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
     getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc, deleteField,
-    query, orderBy, limit, serverTimestamp, where, getDoc
+    query, orderBy, limit, serverTimestamp, where, getDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -1920,6 +1920,8 @@ let fundersAll     = [];    // full funder rows for edit/delete actions
 let tasksAll       = [];    // full task rows for client-side filtering
 let eventsAll      = [];    // full event rows for client-side filtering
 let inspectionsAll = [];    // full inspection rows for client-side filtering
+let liveQueryUnsubscribers = {};
+let dashboardLiveState = {};
 let editingUserId  = null;
 let editingManagedUserId = null;
 let editingFunderId = null;
@@ -1935,6 +1937,33 @@ const ROSTER_SHIFT_OPTIONS = [
     { value: 'night', label: 'Night Shift' },
     { value: 'off', label: 'Off Duty' }
 ];
+
+function hasLiveQuery(key) {
+    return typeof liveQueryUnsubscribers[key] === 'function';
+}
+
+function ensureLiveQuery(key, source, onNext, onError) {
+    if (hasLiveQuery(key)) return liveQueryUnsubscribers[key];
+    liveQueryUnsubscribers[key] = onSnapshot(source, onNext, error => {
+        try {
+            if (typeof liveQueryUnsubscribers[key] === 'function') liveQueryUnsubscribers[key]();
+        } catch (_) { /* ignore unsubscribe errors after query failures */ }
+        delete liveQueryUnsubscribers[key];
+        console.error(`Live query error (${key})`, error);
+        if (typeof onError === 'function') onError(error);
+    });
+    return liveQueryUnsubscribers[key];
+}
+
+function clearLiveQueries() {
+    Object.values(liveQueryUnsubscribers).forEach(unsubscribe => {
+        try {
+            if (typeof unsubscribe === 'function') unsubscribe();
+        } catch (_) { /* ignore unsubscribe errors */ }
+    });
+    liveQueryUnsubscribers = {};
+    dashboardLiveState = {};
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function toast(msg, dur = 3000) {
@@ -2270,6 +2299,7 @@ window.doLogin = async function() {
 
 // ── Logout ───────────────────────────────────────────────────────────
 window.doLogout = async function() {
+    clearLiveQueries();
     await signOut(auth);
 };
 
@@ -2278,6 +2308,7 @@ authPersistenceSettled.finally(() => {
     onAuthStateChanged(auth, async (user) => {
         if (!user) {
             if (await maybeRunDevAutoLogin()) return;
+            clearLiveQueries();
             currentUser    = null;
             currentProfile = null;
             setLoginMessage('');
@@ -2716,25 +2747,16 @@ function updateClock() {
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────
-async function loadDashboardStats() {
+function renderDashboardStats() {
     try {
         const role = getCurrentUserRole();
-        const baseQueries = [
-            getDocs(collection(db, 'residents')),
-            getDocs(collection(db, 'tasks')),
-            role === 'admin'
-                ? getDocs(collection(db, 'leaves'))
-                : getDocs(query(collection(db, 'leaves'), where('staffUid', '==', currentUser.uid))),
-        ];
-        const [rSnap, tSnap, lSnap] = await Promise.all(baseQueries);
-        let uSnap = null;
-        let dSnap = null;
-        if (role === 'admin') {
-            [uSnap, dSnap] = await Promise.all([
-                getDocs(collection(db, 'users')),
-                getDocs(collection(db, 'donations')),
-            ]);
-        }
+        const rSnap = dashboardLiveState.residents;
+        const tSnap = dashboardLiveState.tasks;
+        const lSnap = dashboardLiveState.leaves;
+        const uSnap = role === 'admin' ? dashboardLiveState.users : null;
+        const dSnap = role === 'admin' ? dashboardLiveState.donations : null;
+        const aSnap = role === 'admin' ? dashboardLiveState.activities : null;
+        if (!rSnap || !tSnap || !lSnap || (role === 'admin' && (!uSnap || !dSnap))) return;
 
         const criticalCount   = rSnap.docs.filter(d => d.data().status === 'critical').length;
         const stableCount     = rSnap.docs.filter(d => d.data().status === 'stable').length;
@@ -2854,18 +2876,13 @@ async function loadDashboardStats() {
         // Recent activity
         const tb = document.getElementById('recent-activity');
         tb.innerHTML = '<div class="empty"><div class="e-icon">📭</div><p>No recent activity.</p></div>';
-        if (role === 'admin') {
-            try {
-                const aSnap = await getDocs(query(collection(db, 'activities'), orderBy('date', 'desc'), limit(10)));
-                if (!aSnap.empty) {
-                    tb.innerHTML = `<table><thead><tr><th>Message</th><th>Date</th></tr></thead><tbody>` +
-                        aSnap.docs.map(d => {
-                            const data = d.data();
-                            return `<tr><td>${data.msg || '—'}</td><td>${fmtDate(data.date)}</td></tr>`;
-                        }).join('') +
-                        `</tbody></table>`;
-                }
-            } catch (_) { /* ignore activity query errors */ }
+        if (role === 'admin' && aSnap && !aSnap.empty) {
+            tb.innerHTML = `<table><thead><tr><th>Message</th><th>Date</th></tr></thead><tbody>` +
+                aSnap.docs.map(d => {
+                    const data = d.data();
+                    return `<tr><td>${data.msg || '—'}</td><td>${fmtDate(data.date)}</td></tr>`;
+                }).join('') +
+                `</tbody></table>`;
         }
 
     } catch (e) {
@@ -2873,19 +2890,61 @@ async function loadDashboardStats() {
     }
 }
 
+function loadDashboardStats() {
+    ensureLiveQuery('dashboard:residents', collection(db, 'residents'), snap => {
+        dashboardLiveState.residents = snap;
+        renderDashboardStats();
+    });
+    ensureLiveQuery('dashboard:tasks', collection(db, 'tasks'), snap => {
+        dashboardLiveState.tasks = snap;
+        renderDashboardStats();
+    });
+    ensureLiveQuery(`dashboard:leaves:${getCurrentUserRole()}:${currentUser?.uid || 'guest'}`,
+        getCurrentUserRole() === 'admin'
+            ? collection(db, 'leaves')
+            : query(collection(db, 'leaves'), where('staffUid', '==', currentUser.uid)),
+        snap => {
+            dashboardLiveState.leaves = snap;
+            renderDashboardStats();
+        }
+    );
+    if (getCurrentUserRole() === 'admin') {
+        ensureLiveQuery('dashboard:users', collection(db, 'users'), snap => {
+            dashboardLiveState.users = snap;
+            renderDashboardStats();
+        });
+        ensureLiveQuery('dashboard:donations', collection(db, 'donations'), snap => {
+            dashboardLiveState.donations = snap;
+            renderDashboardStats();
+        });
+        ensureLiveQuery('dashboard:activities', query(collection(db, 'activities'), orderBy('date', 'desc'), limit(10)), snap => {
+            dashboardLiveState.activities = snap;
+            renderDashboardStats();
+        });
+    }
+    renderDashboardStats();
+}
+
 // ── Residents ──────────────────────────────────────────────────────────
 async function loadResidents() {
     const tb = document.getElementById('residents-tbody');
+    if (hasLiveQuery('residents')) {
+        filterResidents();
+        return;
+    }
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'residents'));
-        residentsCache = {};
-        residentsAll = [];
-        snap.docs.forEach(d => {
-            residentsCache[d.id] = d.data();
-            residentsAll.push({ id: d.id, ...d.data() });
+        ensureLiveQuery('residents', collection(db, 'residents'), snap => {
+            residentsCache = {};
+            residentsAll = [];
+            snap.docs.forEach(d => {
+                residentsCache[d.id] = d.data();
+                residentsAll.push({ id: d.id, ...d.data() });
+            });
+            filterResidents();
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
         });
-        filterResidents();
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
@@ -2955,12 +3014,21 @@ async function loadUsers() {
         renderWorkRoster([], [], []);
         return;
     }
-    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
-    try {
-        const snap = await getDocs(collection(db, STAFF_DIRECTORY_COLLECTION));
-        usersAll = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+    if (hasLiveQuery('staff-directory')) {
         filterUsers();
         await loadWorkRoster(usersAll);
+        return;
+    }
+    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
+    try {
+        ensureLiveQuery('staff-directory', collection(db, STAFF_DIRECTORY_COLLECTION), async snap => {
+            usersAll = snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+            filterUsers();
+            await loadWorkRoster(usersAll);
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+            renderWorkRoster([], [], [], e);
+        });
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
         renderWorkRoster([], [], [], e);
@@ -3860,23 +3928,31 @@ async function saveManagedUser() {
 // ── Tasks ─────────────────────────────────────────────────────────────
 async function loadTasks() {
     const tb = document.getElementById('tasks-tbody');
+    if (hasLiveQuery('tasks')) {
+        filterTasks();
+        return;
+    }
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'tasks'));
-        tasksAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => {
-                const aIsCompleted = (a.status || 'pending') === 'completed' ? 1 : 0;
-                const bIsCompleted = (b.status || 'pending') === 'completed' ? 1 : 0;
-                if (aIsCompleted !== bIsCompleted) return aIsCompleted - bIsCompleted;
-                const aDue = timestampToMillis(a.dueDate);
-                const bDue = timestampToMillis(b.dueDate);
-                if (!aDue && bDue) return 1;
-                if (aDue && !bDue) return -1;
-                const dueDiff = aDue - bDue;
-                if (dueDiff !== 0) return dueDiff;
-                return getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a);
-            });
-        filterTasks();
+        ensureLiveQuery('tasks', collection(db, 'tasks'), snap => {
+            tasksAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => {
+                    const aIsCompleted = (a.status || 'pending') === 'completed' ? 1 : 0;
+                    const bIsCompleted = (b.status || 'pending') === 'completed' ? 1 : 0;
+                    if (aIsCompleted !== bIsCompleted) return aIsCompleted - bIsCompleted;
+                    const aDue = timestampToMillis(a.dueDate);
+                    const bDue = timestampToMillis(b.dueDate);
+                    if (!aDue && bDue) return 1;
+                    if (aDue && !bDue) return -1;
+                    const dueDiff = aDue - bDue;
+                    if (dueDiff !== 0) return dueDiff;
+                    return getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a);
+                });
+            filterTasks();
+        }, e => {
+            tasksAll = [];
+            tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+        });
     } catch (e) {
         tasksAll = [];
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
@@ -3974,12 +4050,20 @@ async function deleteTask(id) {
 // ── Events ────────────────────────────────────────────────────────────
 async function loadEvents() {
     const tb = document.getElementById('events-tbody');
+    if (hasLiveQuery('events')) {
+        filterEvents();
+        return;
+    }
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'events'));
-        eventsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (timestampToMillis(a.date) - timestampToMillis(b.date)) || (getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a)));
-        filterEvents();
+        ensureLiveQuery('events', collection(db, 'events'), snap => {
+            eventsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (timestampToMillis(a.date) - timestampToMillis(b.date)) || (getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a)));
+            filterEvents();
+        }, e => {
+            eventsAll = [];
+            tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+        });
     } catch (e) {
         eventsAll = [];
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
@@ -4071,12 +4155,20 @@ async function deleteEvent(id) {
 // ── Inspections ───────────────────────────────────────────────────────
 async function loadInspections() {
     const tb = document.getElementById('inspections-tbody');
+    if (hasLiveQuery('inspections')) {
+        filterInspections();
+        return;
+    }
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'inspections'));
-        inspectionsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (timestampToMillis(b.date) - timestampToMillis(a.date)) || (getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a)));
-        filterInspections();
+        ensureLiveQuery('inspections', collection(db, 'inspections'), snap => {
+            inspectionsAll = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (timestampToMillis(b.date) - timestampToMillis(a.date)) || (getLatestEntryTimestamp(b) - getLatestEntryTimestamp(a)));
+            filterInspections();
+        }, e => {
+            inspectionsAll = [];
+            tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+        });
     } catch (e) {
         inspectionsAll = [];
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
@@ -4150,24 +4242,28 @@ async function deleteInspection(id) {
 // ── Medications ────────────────────────────────────────────────────────
 async function loadMedications() {
     const tb = document.getElementById('medications-tbody');
+    if (hasLiveQuery('medications')) return;
     tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'medications'));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">💊</div><p>No medications found.</p></div></td></tr>';
-            return;
-        }
-        tb.innerHTML = snap.docs.map(d => {
-            const m = d.data();
-            const resName = residentsCache[m.residentId]?.name || m.residentId || '—';
-            return `<tr>
-                <td>${resName}</td>
-                <td><strong>${m.name || '—'}</strong></td>
-                <td>${m.dosage || '—'}</td>
-                <td>${m.schedule || '—'}</td>
-                <td>${fmtDate(m.lastGiven)}</td>
-            </tr>`;
-        }).join('');
+        ensureLiveQuery('medications', collection(db, 'medications'), snap => {
+            if (snap.empty) {
+                tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">💊</div><p>No medications found.</p></div></td></tr>';
+                return;
+            }
+            tb.innerHTML = snap.docs.map(d => {
+                const m = d.data();
+                const resName = residentsCache[m.residentId]?.name || m.residentId || '—';
+                return `<tr>
+                    <td>${resName}</td>
+                    <td><strong>${m.name || '—'}</strong></td>
+                    <td>${m.dosage || '—'}</td>
+                    <td>${m.schedule || '—'}</td>
+                    <td>${fmtDate(m.lastGiven)}</td>
+                </tr>`;
+            }).join('');
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        });
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
@@ -4181,34 +4277,39 @@ async function loadFinance() {
 // ── Funders Hub ───────────────────────────────────────────────────────────
 async function loadFunders() {
     const tb = document.getElementById('funders-tbody');
+    if (hasLiveQuery('funders')) return;
     tb.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(query(collection(db, 'funders'), orderBy('name')));
-        fundersAll = snap.docs.map(d => ({ _docId: d.id, ...(d.data() || {}) }));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="e-icon">🤝</div><p>No funders added yet.</p></div></td></tr>';
-            return;
-        }
-        tb.innerHTML = fundersAll.map(funder => {
-            const contactSummary = [funder.email, funder.phone].filter(Boolean).map(escapeHTML).join('<br>') || '—';
-            const safeDocId = escapeHTML(String(funder._docId || ''));
-            const funderLabel = escapeHTML(funder.name || 'funder');
-            const actions = getCurrentUserRole() === 'admin'
-                ? `<div class="table-actions">
-                    <button class="btn btn-ghost btn-sm" data-funder-id="${safeDocId}" onclick="editFunder(this.dataset.funderId)" aria-label="Edit funder ${funderLabel}">✏️ Edit</button>
-                    <button class="btn btn-ghost btn-sm" data-funder-id="${safeDocId}" onclick="deleteFunderEntry(this.dataset.funderId)" aria-label="Delete funder ${funderLabel}">🗑 Delete</button>
-                </div>`
-                : '—';
-            return `<tr>
-                <td><strong>${escapeHTML(funder.name || '—')}</strong></td>
-                <td>${escapeHTML(funder.contactPerson || '—')}</td>
-                <td>${contactSummary}</td>
-                <td><span class="badge badge-purple">${escapeHTML(funder.fundingType || '—')}</span></td>
-                <td>${statusBadge(funder.status || 'inactive')}</td>
-                <td>${escapeHTML(funder.notes || '—')}</td>
-                <td>${actions}</td>
-            </tr>`;
-        }).join('');
+        ensureLiveQuery('funders', query(collection(db, 'funders'), orderBy('name')), snap => {
+            fundersAll = snap.docs.map(d => ({ _docId: d.id, ...(d.data() || {}) }));
+            if (snap.empty) {
+                tb.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="e-icon">🤝</div><p>No funders added yet.</p></div></td></tr>';
+                return;
+            }
+            tb.innerHTML = fundersAll.map(funder => {
+                const contactSummary = [funder.email, funder.phone].filter(Boolean).map(escapeHTML).join('<br>') || '—';
+                const safeDocId = escapeHTML(String(funder._docId || ''));
+                const funderLabel = escapeHTML(funder.name || 'funder');
+                const actions = getCurrentUserRole() === 'admin'
+                    ? `<div class="table-actions">
+                        <button class="btn btn-ghost btn-sm" data-funder-id="${safeDocId}" onclick="editFunder(this.dataset.funderId)" aria-label="Edit funder ${funderLabel}">✏️ Edit</button>
+                        <button class="btn btn-ghost btn-sm" data-funder-id="${safeDocId}" onclick="deleteFunderEntry(this.dataset.funderId)" aria-label="Delete funder ${funderLabel}">🗑 Delete</button>
+                    </div>`
+                    : '—';
+                return `<tr>
+                    <td><strong>${escapeHTML(funder.name || '—')}</strong></td>
+                    <td>${escapeHTML(funder.contactPerson || '—')}</td>
+                    <td>${contactSummary}</td>
+                    <td><span class="badge badge-purple">${escapeHTML(funder.fundingType || '—')}</span></td>
+                    <td>${statusBadge(funder.status || 'inactive')}</td>
+                    <td>${escapeHTML(funder.notes || '—')}</td>
+                    <td>${actions}</td>
+                </tr>`;
+            }).join('');
+        }, e => {
+            fundersAll = [];
+            tb.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+        });
     } catch (e) {
         fundersAll = [];
         tb.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
@@ -4218,23 +4319,27 @@ async function loadFunders() {
 // ── Donations ──────────────────────────────────────────────────────────
 async function loadDonations() {
     const tb = document.getElementById('donations-tbody');
+    if (hasLiveQuery('donations')) return;
     tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'donations'));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">💰</div><p>No donations recorded.</p></div></td></tr>';
-            return;
-        }
-        tb.innerHTML = snap.docs.map(d => {
-            const dn = d.data();
-            return `<tr>
-                <td><strong>${dn.donor || '—'}</strong></td>
-                <td><span class="badge badge-cyan">${dn.type || '—'}</span></td>
-                <td>${dn.amount || '—'}</td>
-                <td>${fmtDate(dn.date)}</td>
-                <td>${dn.notes || '—'}</td>
-            </tr>`;
-        }).join('');
+        ensureLiveQuery('donations', collection(db, 'donations'), snap => {
+            if (snap.empty) {
+                tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">💰</div><p>No donations recorded.</p></div></td></tr>';
+                return;
+            }
+            tb.innerHTML = snap.docs.map(d => {
+                const dn = d.data();
+                return `<tr>
+                    <td><strong>${dn.donor || '—'}</strong></td>
+                    <td><span class="badge badge-cyan">${dn.type || '—'}</span></td>
+                    <td>${dn.amount || '—'}</td>
+                    <td>${fmtDate(dn.date)}</td>
+                    <td>${dn.notes || '—'}</td>
+                </tr>`;
+            }).join('');
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        });
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
@@ -4242,23 +4347,27 @@ async function loadDonations() {
 
 async function loadIncome() {
     const tb = document.getElementById('income-tbody');
+    if (hasLiveQuery('income')) return;
     tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'income'));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">📈</div><p>No income recorded.</p></div></td></tr>';
-            return;
-        }
-        tb.innerHTML = snap.docs.map(d => {
-            const inc = d.data();
-            return `<tr>
-                <td><strong>${inc.source || '—'}</strong></td>
-                <td><span class="badge badge-purple">${inc.category || '—'}</span></td>
-                <td>${inc.amount || '—'}</td>
-                <td>${fmtDate(inc.date)}</td>
-                <td>${inc.notes || '—'}</td>
-            </tr>`;
-        }).join('');
+        ensureLiveQuery('income', collection(db, 'income'), snap => {
+            if (snap.empty) {
+                tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">📈</div><p>No income recorded.</p></div></td></tr>';
+                return;
+            }
+            tb.innerHTML = snap.docs.map(d => {
+                const inc = d.data();
+                return `<tr>
+                    <td><strong>${inc.source || '—'}</strong></td>
+                    <td><span class="badge badge-purple">${inc.category || '—'}</span></td>
+                    <td>${inc.amount || '—'}</td>
+                    <td>${fmtDate(inc.date)}</td>
+                    <td>${inc.notes || '—'}</td>
+                </tr>`;
+            }).join('');
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        });
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
@@ -4266,23 +4375,27 @@ async function loadIncome() {
 
 async function loadExpenditure() {
     const tb = document.getElementById('expenditure-tbody');
+    if (hasLiveQuery('expenditure')) return;
     tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(collection(db, 'expenditure'));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">📉</div><p>No expenditure recorded.</p></div></td></tr>';
-            return;
-        }
-        tb.innerHTML = snap.docs.map(d => {
-            const exp = d.data();
-            return `<tr>
-                <td><strong>${exp.description || '—'}</strong></td>
-                <td><span class="badge badge-amber">${exp.category || '—'}</span></td>
-                <td>${exp.amount || '—'}</td>
-                <td>${fmtDate(exp.date)}</td>
-                <td>${statusBadge(exp.status || 'pending')}</td>
-            </tr>`;
-        }).join('');
+        ensureLiveQuery('expenditure', collection(db, 'expenditure'), snap => {
+            if (snap.empty) {
+                tb.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="e-icon">📉</div><p>No expenditure recorded.</p></div></td></tr>';
+                return;
+            }
+            tb.innerHTML = snap.docs.map(d => {
+                const exp = d.data();
+                return `<tr>
+                    <td><strong>${exp.description || '—'}</strong></td>
+                    <td><span class="badge badge-amber">${exp.category || '—'}</span></td>
+                    <td>${exp.amount || '—'}</td>
+                    <td>${fmtDate(exp.date)}</td>
+                    <td>${statusBadge(exp.status || 'pending')}</td>
+                </tr>`;
+            }).join('');
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        });
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
@@ -4291,46 +4404,51 @@ async function loadExpenditure() {
 // ── Leaves ─────────────────────────────────────────────────────────────
 async function loadLeaves() {
     const tb = document.getElementById('leaves-tbody');
+    const leavesLiveKey = `leaves:${getCurrentUserRole()}:${currentUser?.uid || 'guest'}`;
+    if (hasLiveQuery(leavesLiveKey)) return;
     tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
         const role  = getCurrentUserRole();
-        let snap;
-        if (role === 'admin') {
-            snap = await getDocs(collection(db, 'leaves'));
-        } else {
-            snap = await getDocs(query(collection(db, 'leaves'), where('staffUid', '==', currentUser.uid)));
-        }
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🗓️</div><p>No leave requests found.</p></div></td></tr>';
-            return;
-        }
+        ensureLiveQuery(leavesLiveKey,
+            role === 'admin'
+                ? collection(db, 'leaves')
+                : query(collection(db, 'leaves'), where('staffUid', '==', currentUser.uid)),
+            async snap => {
+                if (snap.empty) {
+                    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🗓️</div><p>No leave requests found.</p></div></td></tr>';
+                    return;
+                }
 
-        // Build a uid→name map for readable staff names
-        const usersMap  = {};
-        if (role === 'admin') {
-            const usersSnap = await getDocs(collection(db, 'users'));
-            usersSnap.docs.forEach(d => { usersMap[d.id] = d.data().name || d.id; });
-        } else {
-            usersMap[currentUser.uid] = currentProfile.name || currentUser.uid;
-        }
+                const usersMap  = {};
+                if (role === 'admin') {
+                    const usersSnap = await getDocs(collection(db, 'users'));
+                    usersSnap.docs.forEach(d => { usersMap[d.id] = d.data().name || d.id; });
+                } else {
+                    usersMap[currentUser.uid] = currentProfile.name || currentUser.uid;
+                }
 
-        tb.innerHTML = snap.docs.map(d => {
-            const lv = d.data();
-            const staffName = usersMap[lv.staffUid] || lv.staffUid || '—';
-            let actions = '';
-            if (role === 'admin' && lv.status === 'pending') {
-                actions = `<button class="btn btn-ghost btn-sm" onclick="approveLeave('${d.id}')">✅ Approve</button>
-                           <button class="btn btn-ghost btn-sm" onclick="denyLeave('${d.id}')">❌ Deny</button>`;
+                tb.innerHTML = snap.docs.map(d => {
+                    const lv = d.data();
+                    const staffName = usersMap[lv.staffUid] || lv.staffUid || '—';
+                    let actions = '';
+                    if (role === 'admin' && lv.status === 'pending') {
+                        actions = `<button class="btn btn-ghost btn-sm" onclick="approveLeave('${d.id}')">✅ Approve</button>
+                                   <button class="btn btn-ghost btn-sm" onclick="denyLeave('${d.id}')">❌ Deny</button>`;
+                    }
+                    return `<tr>
+                        <td>${staffName}</td>
+                        <td>${lv.type || '—'}</td>
+                        <td>${fmtDate(lv.startDate)}</td>
+                        <td>${fmtDate(lv.endDate)}</td>
+                        <td>${statusBadge(lv.status || 'pending')}</td>
+                        <td>${actions || '—'}</td>
+                    </tr>`;
+                }).join('');
+            },
+            e => {
+                tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
             }
-            return `<tr>
-                <td>${staffName}</td>
-                <td>${lv.type || '—'}</td>
-                <td>${fmtDate(lv.startDate)}</td>
-                <td>${fmtDate(lv.endDate)}</td>
-                <td>${statusBadge(lv.status || 'pending')}</td>
-                <td>${actions || '—'}</td>
-            </tr>`;
-        }).join('');
+        );
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
@@ -4348,17 +4466,21 @@ async function denyLeave(id) {
 // ── Activities ─────────────────────────────────────────────────────────
 async function loadActivities() {
     const tb = document.getElementById('activities-tbody');
+    if (hasLiveQuery('activities:list')) return;
     tb.innerHTML = '<tr><td colspan="2"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
-        const snap = await getDocs(query(collection(db, 'activities'), orderBy('date', 'desc'), limit(50)));
-        if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="2"><div class="empty"><div class="e-icon">📜</div><p>No activity logs.</p></div></td></tr>';
-            return;
-        }
-        tb.innerHTML = snap.docs.map(d => {
-            const a = d.data();
-            return `<tr><td>${a.msg || '—'}</td><td>${fmtDate(a.date)}</td></tr>`;
-        }).join('');
+        ensureLiveQuery('activities:list', query(collection(db, 'activities'), orderBy('date', 'desc'), limit(50)), snap => {
+            if (snap.empty) {
+                tb.innerHTML = '<tr><td colspan="2"><div class="empty"><div class="e-icon">📜</div><p>No activity logs.</p></div></td></tr>';
+                return;
+            }
+            tb.innerHTML = snap.docs.map(d => {
+                const a = d.data();
+                return `<tr><td>${a.msg || '—'}</td><td>${fmtDate(a.date)}</td></tr>`;
+            }).join('');
+        }, e => {
+            tb.innerHTML = `<tr><td colspan="2"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
+        });
     } catch (e) {
         tb.innerHTML = `<tr><td colspan="2"><div class="empty"><div class="e-icon">❌</div><p>Error: ${e.message}</p></div></td></tr>`;
     }
