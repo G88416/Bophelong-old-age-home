@@ -1395,10 +1395,10 @@
                     <div class="card-body" style="padding:0">
                         <table>
                             <thead>
-                                <tr><th>Funder</th><th>Contact</th><th>Email / Phone</th><th>Funding Type</th><th>Status</th><th>Notes</th></tr>
+                                <tr><th>Funder</th><th>Contact</th><th>Email / Phone</th><th>Funding Type</th><th>Status</th><th>Notes</th><th>Actions</th></tr>
                             </thead>
                             <tbody id="funders-tbody">
-                                <tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
+                                <tr><td colspan="7"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1669,7 +1669,7 @@
 <!-- Funder modal -->
 <div class="modal-overlay" id="modal-funder" hidden>
     <div class="modal">
-        <h3>🤝 Add Funder</h3>
+        <h3 id="funder-modal-title">🤝 Add Funder</h3>
         <div class="form-group"><label>Funder Name</label><input id="f-name" placeholder="Organisation or individual name"></div>
         <div class="form-group"><label>Contact Person</label><input id="f-contact" placeholder="Primary relationship owner"></div>
         <div class="form-group"><label>Email Address</label><input id="f-email" type="email" placeholder="contact@funder.org"></div>
@@ -1695,7 +1695,7 @@
         <div class="modal-msg" id="modal-funder-msg"></div>
         <div class="modal-footer">
             <button class="btn btn-ghost" onclick="closeModal('funder')">Cancel</button>
-            <button class="btn btn-primary" onclick="saveFunder()">Save Funder</button>
+            <button class="btn btn-primary" id="save-funder-btn" onclick="saveFunder()">Save Funder</button>
         </div>
     </div>
 </div>
@@ -1794,7 +1794,7 @@ import { getAnalytics }
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, fetchSignInMethodsForEmail }
     from "https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js";
 import {
-    getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc,
+    getFirestore, collection, getDocs, addDoc, doc, setDoc, updateDoc, deleteDoc, deleteField,
     query, orderBy, limit, serverTimestamp, where, getDoc
 } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
 
@@ -1916,11 +1916,13 @@ let residentsCache  = {};    // id → resident doc for quick lookup
 let residentsAll    = [];    // full resident rows for client-side filtering
 let usersAll       = [];    // full user rows for client-side filtering
 let managedUsersAll = [];    // full app user rows for settings user management
+let fundersAll     = [];    // full funder rows for edit/delete actions
 let tasksAll       = [];    // full task rows for client-side filtering
 let eventsAll      = [];    // full event rows for client-side filtering
 let inspectionsAll = [];    // full inspection rows for client-side filtering
 let editingUserId  = null;
 let editingManagedUserId = null;
+let editingFunderId = null;
 const PROFILE_LOAD_RETRY_DELAY_MS = 300;
 const STAFF_DIRECTORY_COLLECTION = 'staffDirectory';
 const MANAGED_USER_COLLECTION = 'users';
@@ -3351,6 +3353,60 @@ window.editUser = function(id) {
     document.getElementById('modal-user').removeAttribute('hidden');
 };
 
+function resetFunderModalMessage() {
+    const msg = document.getElementById('modal-funder-msg');
+    msg.textContent = '';
+    msg.className = 'modal-msg';
+}
+
+function configureFunderModal(mode = 'create', funder = null) {
+    const isEdit = mode === 'edit' && funder;
+    editingFunderId = isEdit ? funder._docId : null;
+    document.getElementById('funder-modal-title').textContent = isEdit ? '✏️ Edit Funder' : '🤝 Add Funder';
+    document.getElementById('f-name').value = isEdit ? (funder.name || '') : '';
+    document.getElementById('f-contact').value = isEdit ? (funder.contactPerson || '') : '';
+    document.getElementById('f-email').value = isEdit ? (funder.email || '') : '';
+    document.getElementById('f-phone').value = isEdit ? (funder.phone || '') : '';
+    document.getElementById('f-type').value = isEdit ? (funder.fundingType || 'grant') : 'grant';
+    document.getElementById('f-status').value = isEdit ? (funder.status || 'active') : 'active';
+    document.getElementById('f-notes').value = isEdit ? (funder.notes || '') : '';
+    document.getElementById('save-funder-btn').textContent = isEdit ? 'Save Changes' : 'Save Funder';
+    resetFunderModalMessage();
+}
+
+window.editFunder = function(id) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can edit funders.');
+        return;
+    }
+    const funder = fundersAll.find(entry => entry._docId === id);
+    if (!funder) {
+        toast('Unable to find that funder.');
+        return;
+    }
+    configureFunderModal('edit', funder);
+    document.getElementById('modal-funder').removeAttribute('hidden');
+};
+
+window.deleteFunderEntry = async function(id) {
+    if (getCurrentUserRole() !== 'admin') {
+        toast('Only admins can delete funders.');
+        return;
+    }
+    const funder = fundersAll.find(entry => entry._docId === id);
+    if (!funder) {
+        toast('Unable to find that funder.');
+        return;
+    }
+    if (!confirm(`Delete ${funder.name || 'this funder'} from the Funders Hub?`)) return;
+    try {
+        await deleteDoc(doc(db, 'funders', id));
+        await logActivity(`Funder deleted: ${funder.name || id}`);
+        toast('Funder deleted.');
+        loadFunders();
+    } catch (e) { toast('Error: ' + e.message); }
+};
+
 function renderSettingsModuleSummary(filteredUsers = managedUsersAll) {
     const moduleSummary = document.getElementById('settings-module-summary');
     const userSummary = document.getElementById('settings-user-summary');
@@ -4125,16 +4181,24 @@ async function loadFinance() {
 // ── Funders Hub ───────────────────────────────────────────────────────────
 async function loadFunders() {
     const tb = document.getElementById('funders-tbody');
-    tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
+    tb.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="e-icon">⏳</div><p>Loading…</p></div></td></tr>';
     try {
         const snap = await getDocs(query(collection(db, 'funders'), orderBy('name')));
+        fundersAll = snap.docs.map(d => ({ _docId: d.id, ...(d.data() || {}) }));
         if (snap.empty) {
-            tb.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="e-icon">🤝</div><p>No funders added yet.</p></div></td></tr>';
+            tb.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="e-icon">🤝</div><p>No funders added yet.</p></div></td></tr>';
             return;
         }
-        tb.innerHTML = snap.docs.map(d => {
-            const funder = d.data() || {};
+        tb.innerHTML = fundersAll.map(funder => {
             const contactSummary = [funder.email, funder.phone].filter(Boolean).map(escapeHTML).join('<br>') || '—';
+            const safeDocId = escapeHTML(String(funder._docId || ''));
+            const funderLabel = escapeHTML(funder.name || 'funder');
+            const actions = getCurrentUserRole() === 'admin'
+                ? `<div class="table-actions">
+                    <button class="btn btn-ghost btn-sm" data-funder-id="${safeDocId}" onclick="editFunder(this.dataset.funderId)" aria-label="Edit funder ${funderLabel}">✏️ Edit</button>
+                    <button class="btn btn-ghost btn-sm" data-funder-id="${safeDocId}" onclick="deleteFunderEntry(this.dataset.funderId)" aria-label="Delete funder ${funderLabel}">🗑 Delete</button>
+                </div>`
+                : '—';
             return `<tr>
                 <td><strong>${escapeHTML(funder.name || '—')}</strong></td>
                 <td>${escapeHTML(funder.contactPerson || '—')}</td>
@@ -4142,10 +4206,12 @@ async function loadFunders() {
                 <td><span class="badge badge-purple">${escapeHTML(funder.fundingType || '—')}</span></td>
                 <td>${statusBadge(funder.status || 'inactive')}</td>
                 <td>${escapeHTML(funder.notes || '—')}</td>
+                <td>${actions}</td>
             </tr>`;
         }).join('');
     } catch (e) {
-        tb.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
+        fundersAll = [];
+        tb.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="e-icon">❌</div><p>Error: ${escapeHTML(e.message)}</p></div></td></tr>`;
     }
 }
 
@@ -4308,6 +4374,8 @@ window.openModal  = function(name) {
     // Reset user form fields each time the modal is opened
     if (name === 'user') {
         configureUserModal('create');
+    } else if (name === 'funder') {
+        configureFunderModal('create');
     } else if (name === 'managed-user') {
         configureManagedUserModal('create');
     }
@@ -4318,6 +4386,9 @@ window.closeModal = function(name) {
     if (name === 'user') {
         editingUserId = null;
         resetUserModalMessage();
+    } else if (name === 'funder') {
+        editingFunderId = null;
+        resetFunderModalMessage();
     } else if (name === 'managed-user') {
         editingManagedUserId = null;
         resetManagedUserModalMessage();
@@ -4538,6 +4609,10 @@ window.saveDonation = async function() {
 
 // ── Save Funder ──────────────────────────────────────────────────────────
 window.saveFunder = async function() {
+    if (getCurrentUserRole() !== 'admin') {
+        modalMsg('funder', 'Only admins can manage funders.', 'error');
+        return;
+    }
     const name = document.getElementById('f-name').value.trim();
     const contactPerson = document.getElementById('f-contact').value.trim();
     const email = normalizeEmail(document.getElementById('f-email').value);
@@ -4545,6 +4620,7 @@ window.saveFunder = async function() {
     const fundingType = document.getElementById('f-type').value;
     const status = document.getElementById('f-status').value;
     const notes = document.getElementById('f-notes').value.trim();
+    const isEdit = !!editingFunderId;
     if (!name || !contactPerson || (!email && !phone)) {
         modalMsg('funder', 'Funder name, contact person, and at least one contact detail (email or phone) are required.', 'error');
         return;
@@ -4553,23 +4629,46 @@ window.saveFunder = async function() {
         modalMsg('funder', 'Enter a valid email address or leave the email field blank.', 'error');
         return;
     }
+    const btn = document.getElementById('save-funder-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> ${isEdit ? 'Saving…' : 'Creating…'}`;
     try {
-        await addDoc(collection(db, 'funders'), {
-            name,
-            contactPerson,
-            ...(email ? { email } : {}),
-            ...(phone ? { phone } : {}),
-            fundingType,
-            status,
-            ...(notes ? { notes } : {}),
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-        });
-        await logActivity(`Funder added: ${name} (${fundingType})`);
+        if (isEdit) {
+            const existing = fundersAll.find(entry => entry._docId === editingFunderId);
+            if (!existing) throw new Error('That funder could not be found.');
+            await updateDoc(doc(db, 'funders', editingFunderId), {
+                name,
+                contactPerson,
+                email: email || deleteField(),
+                phone: phone || deleteField(),
+                fundingType,
+                status,
+                notes: notes || deleteField(),
+                updatedAt: serverTimestamp()
+            });
+            await logActivity(`Funder updated: ${name} (${fundingType})`);
+        } else {
+            await addDoc(collection(db, 'funders'), {
+                name,
+                contactPerson,
+                ...(email ? { email } : {}),
+                ...(phone ? { phone } : {}),
+                fundingType,
+                status,
+                ...(notes ? { notes } : {}),
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            });
+            await logActivity(`Funder added: ${name} (${fundingType})`);
+        }
         closeModal('funder');
-        toast('Funder saved.');
+        toast(isEdit ? 'Funder updated.' : 'Funder saved.');
         loadFunders();
     } catch (e) { modalMsg('funder', 'Error: ' + e.message, 'error'); }
+    finally {
+        btn.disabled = false;
+        btn.textContent = isEdit ? 'Save Changes' : 'Save Funder';
+    }
 };
 
 // ── Save Income ──────────────────────────────────────────────────────────
