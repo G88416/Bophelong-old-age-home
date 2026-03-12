@@ -224,7 +224,7 @@ service cloud.firestore {
       return value is string
         && value.size() > 0
         && value.size() <= maxLength
-        && value.matches('.*[^\\s].*');
+        && value.matches('^.*\\S.*$');
     }
 
     function isFunderPayload(data) {
@@ -242,6 +242,14 @@ service cloud.firestore {
         && (!data.keys().hasAll(['notes']) || (data.notes is string && data.notes.size() <= 2000))
         && (!data.keys().hasAll(['createdAt']) || data.createdAt is timestamp)
         && (!data.keys().hasAll(['updatedAt']) || data.updatedAt is timestamp);
+    }
+
+    function preservesFunderCreatedAt() {
+      return !resource.data.keys().hasAll(['createdAt'])
+        || (
+          request.resource.data.keys().hasAll(['createdAt'])
+          && request.resource.data.createdAt == resource.data.createdAt
+        );
     }
 
     function isEventPayload(data) {
@@ -337,14 +345,7 @@ service cloud.firestore {
       allow update: if isAdmin()
         && isFunderPayload(request.resource.data)
         && request.resource.data.keys().hasAll(['updatedAt'])
-        && (
-          resource == null
-          || !resource.data.keys().hasAll(['createdAt'])
-          || (
-            request.resource.data.keys().hasAll(['createdAt'])
-            && request.resource.data.createdAt == resource.data.createdAt
-          )
-        );
+        && preservesFunderCreatedAt();
       allow delete: if isAdmin();
     }
 
